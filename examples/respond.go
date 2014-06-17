@@ -7,7 +7,7 @@ import (
 	"worker"
 )
 
-const addTube = `example_add`
+const addResponseTube = `example_add_response`
 
 type addData struct {
 	A int `json:"a"`
@@ -21,7 +21,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 		return req.RetryJob(err, 3, nil)
 	}
 
-	log.Printf("A: %d PLUS B: %d IS %d", a.A, a.B, (a.A + a.B))
+	res.Data = a.A + a.B
 	return
 }
 
@@ -32,7 +32,7 @@ func main() {
 	)
 
 	go worker.Run(worker.Worker{
-		Tube:     addTube,
+		Tube:     addResponseTube,
 		Work:     add,
 		Count:    1,
 		Shutdown: shutdown,
@@ -50,10 +50,21 @@ func main() {
 	}
 
 	req := make(map[string]interface{}, 2)
+	req["request"] = "abc"
 	req["data"] = a
 
-	_, err := worker.Send(addTube, req, "")
+	resp, err := worker.Send(addResponseTube, req, "abc")
 	if err != nil {
 		log.Println("err:", err)
+		return
 	}
+
+	data := make(map[string]interface{}, 2)
+	err = json.Unmarshal(resp, &data)
+	if err != nil {
+		log.Println("err:", err)
+		return
+	}
+
+	log.Println("A + B =", data["data"])
 }
