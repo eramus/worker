@@ -96,13 +96,13 @@ This helper handles configuring and running your worker. ```Run``` will respond 
 type WorkerFunc func(*Request) Response
 ```
 
-The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response```.
+The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response``` -- easy as that. What you do inside is completely up to you. Take a look at the examples directory for some ideas.
 
 ```go
 func Send(workerTube string, data map[string]interface{}, requestId string) ([]byte, error)
 ```
 
-This can be used for send work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. The ```requestId``` is an optional parameter that signals ```Send``` that a response from the worker is expected. Raw json is returned for requests that expect responses.
+This can be used for sending work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. The ```requestId``` is an optional parameter that signals ```Send``` that a response from the worker is expected. Raw json is returned for requests that expect responses.
 
 ```go
 type DelayDecay func(int) int
@@ -114,7 +114,7 @@ This allows you to define a function that can be used to adjust the amount of ti
 func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 ```
 
-```RetryJob``` is a helper function that can be used inside of your worker functions to signal ```Run``` to retry a work request. ```RetryJob``` will call ```BuryJob``` is the max number of retries has been reached. If a nil ```DelayDecay``` parameter is passed in, the default decay function will be used (+1 second per retry).
+```RetryJob``` is a helper function that can be used inside of your worker functions to signal ```Run``` to retry a work request. ```RetryJob``` will call ```BuryJob``` if the max number of retries has been reached. If a nil ```DelayDecay``` parameter is passed in, the default decay function will be used (+1 second per retry).
 
 ```go
 func (r *Request) BuryJob(err error) Response
