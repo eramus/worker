@@ -142,5 +142,6 @@ An interface that generates request ids for work requests. These are typically u
 
 * Better connection handling to beanstalkd. An internal connection pool perhaps?
 * A default request id generator
+* Improve the send function. Currently, you need to known too much about how the data will be sent.
 * More flexibility for sending work requests: fire-and-forget, response handlers, etc.
 * tests!
