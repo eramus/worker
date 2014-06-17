@@ -45,6 +45,9 @@ var add = func(req *worker.Request) (res worker.Response) {
 	return
 }
 
+// Typically, the Run and Send functions would not be called
+// from the same process, but, for ease of demonstration, they
+// are combined for this example.
 func main() {
 	// global shutdown channels
 	var (
