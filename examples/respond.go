@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"worker"
+	"github.com/eramus/worker"
 )
 
 const addResponseTube = `example_add_response`
@@ -66,5 +66,5 @@ func main() {
 		return
 	}
 
-	log.Println("A + B =", data["data"])
+	log.Println("2 + 2 =", data["data"])
 }

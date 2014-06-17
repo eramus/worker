@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"worker"
+	"github.com/eramus/worker"
 )
 
 const addTube = `example_add`
@@ -21,7 +21,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 		return req.RetryJob(err, 3, nil)
 	}
 
-	log.Printf("A: %d PLUS B: %d IS %d", a.A, a.B, (a.A + a.B))
+	log.Printf("%d + %d = %d", a.A, a.B, (a.A + a.B))
 	return
 }
 
