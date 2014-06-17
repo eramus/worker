@@ -74,7 +74,7 @@ type Request struct {
 // number of times that a unit of work should be retried. An optional
 // DelayDecay func is accepted for setting the amount of time, based
 // on number of releases, that a unit of work should be delayed before
-// acted against it again.
+// acting against it again.
 func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response {
 	if delay == nil {
 		delay = defaultDecay
@@ -148,7 +148,7 @@ func (r *Request) DeleteJob(err error) Response {
 	}
 }
 
-// helpers for getting tubes to communicate across
+// helpers for getting communication tubes
 func getRequestTube(workerTube string) string {
 	return fmt.Sprintf("%s_request", workerTube)
 }
@@ -158,8 +158,7 @@ func getResponseTube(workerTube string, requestId string) string {
 }
 
 // An interface for generating request ids. This is needed
-// when dealing with workers that act in a synchronous
-// manner.
+// when dealing with workers that act synchronously.
 type RequestIdGenerator interface {
 	GetRequestId() (string, error)
 }
@@ -167,13 +166,13 @@ type RequestIdGenerator interface {
 var requestIdGenerator RequestIdGenerator
 
 // Helper for setting the RequestIdGenerator for a, or a collection
-// of, workers
+// of, worker
 func SetRequestIdGenerator(gen RequestIdGenerator) {
 	requestIdGenerator = gen
 }
 
 // Helper for getting a request id that can be used for
-// returning responses from working against a unit of work.
+// returning finished work responses.
 func GetRequestId() (string, error) {
 	return requestIdGenerator.GetRequestId()
 }

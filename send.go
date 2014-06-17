@@ -7,9 +7,9 @@ import (
 	"github.com/kr/beanstalk"
 )
 
-// Send a unit of work to a worker. 'workerTube' determines
-// the tube that will respond to incoming work. 'requestId' is
-// an optional parameter for delivering responses to the caller
+// Send a unit of work to a worker. 'workerTube' determines the
+// tube that will respond to incoming work. 'requestId' is an
+// optional parameter for delivering responses back to the caller
 func Send(workerTube string, data map[string]interface{}, requestId string) ([]byte, error) {
 	beanConn, err := beanstalk.Dial("tcp", "0.0.0.0:11300")
 	if err != nil {
