@@ -82,3 +82,63 @@ func main() {
 		log.Println("err:", err)
 	}
 }
+```
+
+## Package Overview ##
+
+```go
+func Run(worker Worker)
+```
+
+This helper handles configuring and running your worker. ```Run``` will respond to unhandled worker panics by restarting the working. Care should be taken in this regard, because a worker may spin out of control if properly handling is implemented by the user of the package. ```Run``` is also responsible for gracefully shutting down workers when the main process is ready to exit.
+
+```go
+type WorkerFunc func(*Request) Response
+```
+
+The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response```.
+
+```go
+func Send(workerTube string, data map[string]interface{}, requestId string) ([]byte, error)
+```
+
+This can be used for send work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. The ```requestId``` is an optional parameter that signals ```Send``` that a response from the worker is expected. Raw json is returned for requests that expect responses.
+
+```go
+type DelayDecay func(int) int
+```
+
+This allows you to define a function that can be used to adjust the amount of time in between retries in the event there is a failure in your worker.
+
+```go
+func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
+```
+
+```RetryJob``` is a helper function that can be used inside of your worker functions to signal ```Run``` to retry a work request. ```RetryJob``` will call ```BuryJob``` is the max number of retries has been reached. If a nil ```DelayDecay``` parameter is passed in, the default decay function will be used (+1 second per retry).
+
+```go
+func (r *Request) BuryJob(err error) Response
+```
+
+```BuryJob``` can be used to bury work requests that have failed but should not be deleted. These can be examined a later time to better tune your worker functions.
+
+```go
+func (r *Request) DeleteJob(err error) Response
+```
+
+```DeleteJob``` is used for cases that a work request should just be deleted on error.
+
+```go
+type RequestIdGenerator interface {
+	GetRequestId() (string, error)
+}
+```
+
+An interface for defining a way to generate request ids for work requests that expect a response. This could be a simple increment, a UUID generator or something more complex involving an outside service. I like to use noeqd (https://github.com/noeq/noeqd).
+
+## TODO ##
+
+* Better connection handling to beanstalkd. An internal connection pool perhaps?
+* A default request id generator
+* More flexibility for sending work requests: fire-and-forget, response handlers, etc.
+* tests!
