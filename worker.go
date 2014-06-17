@@ -45,10 +45,10 @@ var defaultReserve = (2 * time.Second)
 type Result int
 
 const (
-	success Result = iota
-	buryJob
-	deleteJob
-	releaseJob
+	Success Result = iota
+	BuryJob
+	DeleteJob
+	ReleaseJob
 )
 
 // The function that will be performed against a unit of work.
@@ -74,7 +74,7 @@ type Request struct {
 // number of times that a unit of work should be retried. An optional
 // DelayDecay func is accepted for setting the amount of time, based
 // on number of releases, that a unit of work should be delayed before
-// acted against again.
+// acted against it again.
 func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response {
 	if delay == nil {
 		delay = defaultDecay
@@ -84,7 +84,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	if dialErr != nil {
 		// send it back as retry = 1
 		return Response{
-			Result: releaseJob,
+			Result: ReleaseJob,
 			Error:  err,
 			Delay:  delay(1),
 		}
@@ -95,7 +95,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	if statsErr != nil {
 		// send it back as retry = 1
 		return Response{
-			Result: releaseJob,
+			Result: ReleaseJob,
 			Error:  err,
 			Delay:  delay(1),
 		}
@@ -105,7 +105,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	if !ok {
 		// send it back as retry = 1
 		return Response{
-			Result: releaseJob,
+			Result: ReleaseJob,
 			Error:  err,
 			Delay:  delay(1),
 		}
@@ -115,7 +115,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	if strErr != nil {
 		// send it back as retry = 1
 		return Response{
-			Result: releaseJob,
+			Result: ReleaseJob,
 			Error:  err,
 			Delay:  delay(1),
 		}
@@ -126,7 +126,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	}
 
 	return Response{
-		Result: releaseJob,
+		Result: ReleaseJob,
 		Error:  err,
 		Delay:  delay(releases),
 	}
@@ -135,7 +135,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 // Helper for burying a job.
 func (r *Request) BuryJob(err error) Response {
 	return Response{
-		Result: buryJob,
+		Result: BuryJob,
 		Error:  err,
 	}
 }
@@ -143,7 +143,7 @@ func (r *Request) BuryJob(err error) Response {
 // Helper for deleting a job.
 func (r *Request) DeleteJob(err error) Response {
 	return Response{
-		Result: deleteJob,
+		Result: DeleteJob,
 		Error:  err,
 	}
 }

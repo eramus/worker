@@ -16,7 +16,7 @@ type control struct {
 }
 
 // The heart of this package. 'Run' accepts a single
-// argument, 'worker'. This defines what tube should respond
+// argument, 'worker'. This defines which tube should respond
 // to request, what function to act against incoming work
 // and also a pair of channels for shutting down gracefully.
 func Run(worker Worker) {
@@ -117,22 +117,22 @@ func run(workerTube string, workerFunc WorkerFunc, control control) {
 		response := workerFunc(&req)
 
 		switch response.Result {
-		case success:
+		case Success:
 			beanConn.Delete(id)
-		case buryJob:
+		case BuryJob:
 			beanConn.Bury(id, 1)
 			log.Printf("Burying job. Err: %s\n", response.Error)
-		case deleteJob:
+		case DeleteJob:
 			beanConn.Delete(id)
 			log.Printf("Deleting job. Err: %s\n", response.Error)
-		case releaseJob:
+		case ReleaseJob:
 			releaseDelay := (time.Duration(response.Delay) * time.Second)
 			beanConn.Release(id, 1, releaseDelay)
 			log.Printf("Releasing job for: %s Err: %s %s\n", releaseDelay.String(), response.Error, string(msg))
 		}
 
 		// send back a response if requested
-		if req.RequestId != "" && response.Result != releaseJob {
+		if req.RequestId != "" && response.Result != ReleaseJob {
 			jsonRes, err := json.Marshal(response)
 			if err != nil {
 				panic(fmt.Sprintf("response json err: %s", err))
