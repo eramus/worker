@@ -33,7 +33,7 @@ type addData struct {
 	B int `json:"b"`
 }
 
-// a function that will accepts work requests and process them
+// a function that will accept work requests and process them
 var add = func(req *worker.Request) (res worker.Response) {
 	a := &addData{}
 	err := json.Unmarshal(req.Data, a)
@@ -49,25 +49,15 @@ var add = func(req *worker.Request) (res worker.Response) {
 // from the same process, but, for ease of demonstration, they
 // are combined for this example.
 func main() {
-	// global shutdown channels
-	var (
-		shutdown = make(chan struct{})
-		finished = make(chan struct{})
-	)
-
-	// define and launch a worker
-	go worker.Run(worker.Worker{
-		Tube:     addTube,
-		Work:     add,
-		Count:    1,
-		Shutdown: shutdown,
-		Finished: finished,
-	})
+	// define and run a worker
+	add := worker.NewWorker(addTube, add, 10)
+	add.Run()
 
 	// shutdown the worker on exit
 	defer func() {
-		close(shutdown)
-		<-finished
+		f := make(chan struct{})
+		add.Shutdown(f)
+		<-f
 	}()
 
 	// create a unit of work
@@ -90,10 +80,19 @@ func main() {
 ## Package Overview ##
 
 ```go
-func Run(worker Worker)
+type Worker interface {
+	Run()
+	Shutdown(chan<- struct{})
+}
 ```
 
-This helper handles configuring and running your worker. ```Run``` will respond to unhandled worker panics by restarting the working. Care should be taken in this regard, because a worker may spin out of control if properly handling is implemented by the user of the package. ```Run``` is also responsible for gracefully shutting down workers when the main process is ready to exit.
+This interface is used to hide the implementation of the base package from the caller. This exposes just enough functionality to keep working with and defining a worker simple. ```Run``` will block until all worker instances have been launched. ```Shutdown``` does not block so that multiple workers can be shutdown at the same time. ```Shutdown``` accepts an optional channel that can be used to signal the main caller that the shutdown was completed successfully.
+
+```go
+func NewWorker(tube string, workerFunc WorkerFunc, cnt int) Worker {
+```
+
+```NewWorker``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```cnt``` is a non-zero number that represents how many instances of a worker will be launched when ```Run``` is called. ```cnt``` must be non-zero to avoid a panic.
 
 ```go
 type WorkerFunc func(*Request) Response
@@ -137,7 +136,7 @@ type RequestIdGenerator interface {
 }
 ```
 
-An interface for defining a way to generate request ids for work requests that expect a response. This could be a simple increment, a UUID generator or something more complex involving an outside service. I like to use noeqd (https://github.com/noeq/noeqd).
+An interface that generates request ids for work requests. These are typically used for callers that require a response from the worker. This could be a simple incrementer, a UUID generator or something more complex involving an outside service. I like to use noeqd (https://github.com/noeq/noeqd).
 
 ## TODO ##
 

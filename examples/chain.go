@@ -63,31 +63,18 @@ var second = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	var (
-		shutdown = make(chan struct{})
-		finished = make(chan struct{})
-	)
+	first := worker.NewWorker(firstTube, first, 1)
+	first.Run()
 
-	go worker.Run(worker.Worker{
-		Tube:     firstTube,
-		Work:     first,
-		Count:    1,
-		Shutdown: shutdown,
-		Finished: finished,
-	})
-
-	go worker.Run(worker.Worker{
-		Tube:     secondTube,
-		Work:     second,
-		Count:    1,
-		Shutdown: shutdown,
-		Finished: finished,
-	})
+	second := worker.NewWorker(secondTube, second, 1)
+	second.Run()
 
 	defer func() {
-		close(shutdown)
-		<-finished
-		<-finished
+		f := make(chan struct{})
+		second.Shutdown(f)
+		first.Shutdown(f)
+		<-f
+		<-f
 	}()
 
 	a := &firstData{

@@ -17,20 +17,6 @@ var (
 	ErrNoResponse       = errors.New("did not receive a response")
 )
 
-// Worker contains the exported parts of a worker. 'Tube' identifies
-// the beanstalk tube that the worker will respond on. 'Work' is a
-// user defined function that will be called anytime work is delivered
-// on the tube. 'Count' is a number of instances of the worker that
-// should be started. 'Shutdown' and 'Finished' are channels used
-// for signaling workers to stop working.
-type Worker struct {
-	Tube     string
-	Work     WorkerFunc
-	Count    int
-	Shutdown chan struct{}
-	Finished chan struct{}
-}
-
 // A function for determining the amount of delay that should be
 // used each time a job is released.
 type DelayDecay func(int) int

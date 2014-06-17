@@ -26,22 +26,13 @@ var add = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	var (
-		shutdown = make(chan struct{})
-		finished = make(chan struct{})
-	)
-
-	go worker.Run(worker.Worker{
-		Tube:     addResponseTube,
-		Work:     add,
-		Count:    1,
-		Shutdown: shutdown,
-		Finished: finished,
-	})
+	add := worker.NewWorker(addResponseTube, add, 1)
+	add.Run()
 
 	defer func() {
-		close(shutdown)
-		<-finished
+		f := make(chan struct{})
+		add.Shutdown(f)
+		<-f
 	}()
 
 	a := &addData{
