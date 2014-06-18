@@ -74,12 +74,14 @@ func (wg *workerGroup) Shutdown() {
 	defer wg.Unlock()
 
 	// start shutting them down
-	for name, worker := range wg.workers {
+	for _, worker := range wg.workers {
 		worker.Shutdown(f)
-		delete(wg.workers, name)
 	}
 	// wait for everyone to check in
 	for i := 0; i < len(wg.workers); i++ {
 		<-f
+	}
+	for name := range wg.workers {
+		delete(wg.workers, name)
 	}
 }
