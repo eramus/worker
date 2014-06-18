@@ -10,9 +10,10 @@ import (
 )
 
 // Worker contains the exported parts of a worker. This allows
-// the specifics about managing a worker up to the package.
+// the specifics about managing a worker to beleft up to the package.
 type Worker interface {
 	Run()
+	Running() bool
 	Shutdown(chan<- struct{})
 }
 
@@ -22,6 +23,7 @@ type worker struct {
 	count      int
 	shutdown   chan struct{}
 	control    control
+	running    bool
 }
 
 type control struct {
@@ -51,6 +53,10 @@ func NewWorker(tube string, workerFunc WorkerFunc, cnt int) Worker {
 // Run function. This will block until all of the worker instances
 // have been started.
 func (w *worker) Run() {
+	if w.running {
+		return
+	}
+
 	running := make(chan struct{})
 
 	go func() {
@@ -81,6 +87,7 @@ func (w *worker) Run() {
 	}()
 
 	<-running
+	w.running = true
 	// and we're off
 }
 
@@ -169,11 +176,19 @@ func (w *worker) run() {
 	}
 }
 
+// Running will return the current running status of a worker.
+func (w *worker) Running() bool {
+	return w.running
+}
+
 // Shutdown is a non-blocking function that will signal the worker
 // instances and the Run routine to prepare to shutdown. Shutdown
 // accepts an optional channel that serves as a notification that
 // the shutdown has completed succesfully.
 func (w *worker) Shutdown(finished chan<- struct{}) {
+	if !w.running {
+		return
+	}
 	// run this in a go routine so it doesnt block
 	go func(f chan<- struct{}) {
 		// close everything down and wait for checkins
@@ -189,6 +204,7 @@ func (w *worker) Shutdown(finished chan<- struct{}) {
 			}
 			w.count--
 		}
+		w.running = false
 		if f != nil {
 			f <- struct{}{}
 		}
