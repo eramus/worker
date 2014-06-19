@@ -40,22 +40,18 @@ func main() {
 		B: 2,
 	}
 
-	req := make(map[string]interface{}, 2)
-	req["request"] = "abc"
-	req["data"] = a
-
-	resp, err := worker.Send(addResponseTube, req, "abc")
+	resp, err := worker.Send(addResponseTube, a, "abc")
 	if err != nil {
 		log.Println("err:", err)
 		return
 	}
 
-	data := make(map[string]interface{}, 2)
+	var data int
 	err = json.Unmarshal(resp, &data)
 	if err != nil {
 		log.Println("err:", err)
 		return
 	}
 
-	log.Println("2 + 2 =", data["data"])
+	log.Println("2 + 2 =", data)
 }

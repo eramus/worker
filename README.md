@@ -101,7 +101,7 @@ type WorkerFunc func(*Request) Response
 The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response``` -- easy as that. What you do inside is completely up to you. Take a look at the examples directory for some ideas.
 
 ```go
-func Send(workerTube string, data map[string]interface{}, requestId string) ([]byte, error)
+func Send(workerTube string, data interface{}, requestId string) ([]byte, error)
 ```
 
 This can be used for sending work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. The ```requestId``` is an optional parameter that signals ```Send``` that a response from the worker is expected. Raw json is returned for requests that expect responses.
@@ -142,6 +142,5 @@ An interface that generates request ids for work requests. These are typically u
 
 * Better connection handling to beanstalkd. An internal connection pool perhaps?
 * A default request id generator
-* Improve the send function. Currently, you need to known too much about how the data will be sent.
 * More flexibility for sending work requests: fire-and-forget, response handlers, etc.
 * tests!

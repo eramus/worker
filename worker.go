@@ -22,7 +22,7 @@ var (
 type DelayDecay func(int) int
 
 var defaultDecay = func(retries int) int {
-	return retries
+	return 1
 }
 
 var defaultReserve = (2 * time.Second)
@@ -45,7 +45,7 @@ type WorkerFunc func(*Request) Response
 type Response struct {
 	Result Result      `json:"-"`
 	Data   interface{} `json:"data"`
-	Error  error       `json:"error"`
+	Error  string      `json:"error"`
 	Delay  int         `json:"-"`
 }
 
@@ -71,7 +71,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		// send it back as retry = 1
 		return Response{
 			Result: ReleaseJob,
-			Error:  err,
+			Error:  err.Error(),
 			Delay:  delay(1),
 		}
 	}
@@ -82,7 +82,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		// send it back as retry = 1
 		return Response{
 			Result: ReleaseJob,
-			Error:  err,
+			Error:  err.Error(),
 			Delay:  delay(1),
 		}
 	}
@@ -92,7 +92,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		// send it back as retry = 1
 		return Response{
 			Result: ReleaseJob,
-			Error:  err,
+			Error:  err.Error(),
 			Delay:  delay(1),
 		}
 	}
@@ -102,7 +102,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		// send it back as retry = 1
 		return Response{
 			Result: ReleaseJob,
-			Error:  err,
+			Error:  err.Error(),
 			Delay:  delay(1),
 		}
 	}
@@ -113,7 +113,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 
 	return Response{
 		Result: ReleaseJob,
-		Error:  err,
+		Error:  err.Error(),
 		Delay:  delay(releases),
 	}
 }
@@ -122,7 +122,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 func (r *Request) BuryJob(err error) Response {
 	return Response{
 		Result: BuryJob,
-		Error:  err,
+		Error:  err.Error(),
 	}
 }
 
@@ -130,7 +130,7 @@ func (r *Request) BuryJob(err error) Response {
 func (r *Request) DeleteJob(err error) Response {
 	return Response{
 		Result: DeleteJob,
-		Error:  err,
+		Error:  err.Error(),
 	}
 }
 

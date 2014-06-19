@@ -161,7 +161,7 @@ func (w *worker) run() {
 		}
 
 		// send back a response if requested
-		if req.RequestId != "" && resp.Result != ReleaseJob {
+		if len(req.RequestId) > 0 && resp.Result != ReleaseJob {
 			jsonRes, err := json.Marshal(resp)
 			if err != nil {
 				panic(fmt.Sprintf("response json err: %s", err))

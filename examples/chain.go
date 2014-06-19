@@ -31,23 +31,19 @@ var first = func(req *worker.Request) (res worker.Response) {
 		B: 2,
 	}
 
-	secondReq := make(map[string]interface{}, 2)
-	secondReq["request"] = "second"
-	secondReq["data"] = s
-
-	resp, err := worker.Send(secondTube, secondReq, "second")
+	resp, err := worker.Send(secondTube, s, "second")
 	if err != nil {
 		log.Println("err:", err)
 	}
 
-	data := make(map[string]interface{}, 2)
+	var data int
 	err = json.Unmarshal(resp, &data)
 	if err != nil {
 		log.Println("err:", err)
 		return
 	}
 
-	res.Data = data["data"]
+	res.Data = data
 	return
 }
 
@@ -74,21 +70,18 @@ func main() {
 		A: 2,
 	}
 
-	req := make(map[string]interface{}, 2)
-	req["request"] = "first"
-	req["data"] = a
-
-	resp, err := worker.Send(firstTube, req, "first")
+	resp, err := worker.Send(firstTube, a, "first")
 	if err != nil {
 		log.Println("err:", err)
+		return
 	}
 
-	data := make(map[string]interface{}, 2)
+	var data int
 	err = json.Unmarshal(resp, &data)
 	if err != nil {
 		log.Println("err:", err)
 		return
 	}
 
-	log.Println("2 + 2 =", data["data"])
+	log.Println("2 + 2 =", data)
 }

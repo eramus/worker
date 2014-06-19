@@ -2,6 +2,7 @@ package worker
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/kr/beanstalk"
@@ -10,35 +11,43 @@ import (
 // Send a unit of work to a worker. 'workerTube' determines the
 // tube that will respond to incoming work. 'requestId' is an
 // optional parameter for delivering responses back to the caller
-func Send(workerTube string, data map[string]interface{}, requestId string) ([]byte, error) {
+func Send(tube string, data interface{}, requestId string) ([]byte, error) {
+	// put together our request data
+	reqData := make(map[string]interface{}, 2)
+	reqData["data"] = data
+	if len(requestId) > 0 {
+		reqData["request"] = requestId
+	}
+
+	// marshal the data into a payload
+	jsonReq, err := json.Marshal(reqData)
+	if err != nil {
+		return nil, ErrJsonMarshal
+	}
+
+	// connect to beanstalkd
 	beanConn, err := beanstalk.Dial("tcp", "0.0.0.0:11300")
 	if err != nil {
 		return nil, ErrBeanstalkConnect
 	}
 	defer beanConn.Close()
 
-	// marshal the data into a payload
-	jsonReq, err := json.Marshal(data)
-	if err != nil {
-		return nil, ErrJsonMarshal
-	}
-
 	// configure conn for send tube
-	tube := beanstalk.Tube{beanConn, getRequestTube(workerTube)}
+	workerTube := beanstalk.Tube{beanConn, getRequestTube(tube)}
 
 	// send it
-	_, err = tube.Put(jsonReq, 0, 0, (3600 * time.Second))
+	_, err = workerTube.Put(jsonReq, 0, 0, (3600 * time.Second))
 	if err != nil {
 		return nil, ErrUnableToSend
 	}
 
-	// all done with the send
+	// no response -- all done with the send
 	if requestId == "" {
 		return nil, nil
 	}
 
 	var (
-		watch = beanstalk.NewTubeSet(beanConn, getResponseTube(workerTube, requestId))
+		watch = beanstalk.NewTubeSet(beanConn, getResponseTube(tube, requestId))
 		retry = 5
 		id    uint64
 		msg   []byte
@@ -62,6 +71,22 @@ func Send(workerTube string, data map[string]interface{}, requestId string) ([]b
 		break
 	}
 
+	// delete the job
 	beanConn.Delete(id)
-	return msg, nil
+
+	// handle the response
+	resp := &struct {
+		Error string          `json:"error"`
+		Data  json.RawMessage `json:"data"`
+	}{}
+
+	err = json.Unmarshal(msg, resp)
+	if err != nil {
+		return nil, err
+	} else if len(resp.Error) > 0 {
+		return nil, errors.New(resp.Error)
+	}
+
+	// success!
+	return resp.Data, nil
 }
