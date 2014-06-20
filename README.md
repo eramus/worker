@@ -66,11 +66,8 @@ func main() {
 		B: 2,
 	}
 
-	req := make(map[string]interface{}, 2)
-	req["data"] = a
-
 	// send it to our worker
-	_, err := worker.Send(addTube, req, "")
+	_, err := worker.Send(addTube, a, "")
 	if err != nil {
 		log.Println("err:", err)
 	}
