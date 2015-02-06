@@ -56,6 +56,12 @@ type Request struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+var beanstalkHost = "0.0.0.0:11300"
+
+func SetHost(host string) {
+	beanstalkHost = host
+}
+
 // Helper function for retrying a job. This accepts an error and a
 // number of times that a unit of work should be retried. An optional
 // DelayDecay func is accepted for setting the amount of time, based
@@ -66,7 +72,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		delay = defaultDecay
 	}
 
-	beanConn, dialErr := beanstalk.Dial("tcp", "0.0.0.0:11300")
+	beanConn, dialErr := beanstalk.Dial("tcp", beanstalkHost)
 	if dialErr != nil {
 		// send it back as retry = 1
 		return Response{

@@ -26,7 +26,7 @@ func Send(tube string, data interface{}, requestId string) ([]byte, error) {
 	}
 
 	// connect to beanstalkd
-	beanConn, err := beanstalk.Dial("tcp", "0.0.0.0:11300")
+	beanConn, err := beanstalk.Dial("tcp", beanstalkHost)
 	if err != nil {
 		return nil, ErrBeanstalkConnect
 	}

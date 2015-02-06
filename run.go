@@ -92,7 +92,7 @@ func (w *worker) Run() {
 }
 
 func (w *worker) run() {
-	beanConn, err := beanstalk.Dial("tcp", "0.0.0.0:11300")
+	beanConn, err := beanstalk.Dial("tcp", beanstalkHost)
 	if err != nil {
 		panic(fmt.Sprintf("dial err: %s", err))
 	}
