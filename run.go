@@ -102,42 +102,40 @@ func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
 	}()
 
 	for {
-		select {
-		case job, ok := <-jobs:
-			if !ok && job == nil {
-				return
+		job, ok := <-jobs
+		if !ok && job == nil {
+			return
+		}
+
+		out := w.workerFunc(job)
+
+		res := result{
+			result: out.Result,
+			jobId:  job.id,
+		}
+
+		switch out.Result {
+		case BuryJob:
+			res.priority = 1
+		case ReleaseJob:
+			res.priority = 1
+			res.delay = time.Duration(out.Delay) * time.Second
+		default:
+		}
+
+		w.control.completed <- res
+
+		// send back a response if requested
+		if job.Feedback && out.Result != ReleaseJob {
+			jsonRes, err := json.Marshal(out)
+			if err != nil {
+				panic(fmt.Sprintf("response json err: %s", err))
 			}
 
-			out := w.workerFunc(job)
-
-			res := result{
-				result: out.Result,
-				jobId:  job.id,
-			}
-
-			switch out.Result {
-			case BuryJob:
-				res.priority = 1
-			case ReleaseJob:
-				res.priority = 1
-				res.delay = time.Duration(out.Delay) * time.Second
-			default:
-			}
-
-			w.control.completed <- res
-
-			// send back a response if requested
-			if job.Feedback && out.Result != ReleaseJob {
-				jsonRes, err := json.Marshal(out)
-				if err != nil {
-					panic(fmt.Sprintf("response json err: %s", err))
-				}
-
-				// send back a response
-				err = w.sendFeedback(job, jsonRes)
-				if err != nil {
-					panic(fmt.Sprintf("worker response err: %s", err))
-				}
+			// send back a response
+			err = w.sendFeedback(job, jsonRes)
+			if err != nil {
+				panic(fmt.Sprintf("worker response err: %s", err))
 			}
 		}
 	}
