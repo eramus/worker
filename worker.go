@@ -64,7 +64,7 @@ type Request struct {
 }
 
 var beanstalkHost = "0.0.0.0:11300"
-var reserveTime = (100 * time.Millisecond)
+var reserveTime = (2 * time.Second)
 var responsetime = (2 * time.Second)
 
 func SetHost(host string) {

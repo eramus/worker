@@ -123,8 +123,6 @@ func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
 		default:
 		}
 
-		w.control.completed <- res
-
 		// send back a response if requested
 		if job.Feedback && out.Result != ReleaseJob {
 			jsonRes, err := json.Marshal(out)
@@ -138,6 +136,8 @@ func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
 				panic(fmt.Sprintf("worker response err: %s", err))
 			}
 		}
+
+		w.control.completed <- res
 	}
 }
 
