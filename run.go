@@ -171,7 +171,7 @@ func (w *worker) run(started chan<- struct{}) {
 	}
 
 	// watch the worker tube
-	var watch = beanstalk.NewTubeSet(beanConn, getRequestTube(w.tube))
+	var watch = beanstalk.NewTubeSet(beanConn, w.tube)
 
 	// off we go
 	close(started)

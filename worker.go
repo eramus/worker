@@ -157,11 +157,7 @@ func (r *Request) DeleteJob(err error) Response {
 	}
 }
 
-// helpers for getting communication tubes
-func getRequestTube(workerTube string) string {
-	return fmt.Sprintf("%s", workerTube)
-}
-
+// helper for getting response tubes
 func getResponseTube(workerTube string, jobId uint64) string {
 	return fmt.Sprintf("%s_%d", workerTube, jobId)
 }
