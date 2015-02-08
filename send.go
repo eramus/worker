@@ -33,7 +33,7 @@ func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
 	defer beanConn.Close()
 
 	// configure conn for send tube
-	workerTube := beanstalk.Tube{beanConn, getRequestTube(tube)}
+	workerTube := beanstalk.Tube{beanConn, tube}
 
 	// send it
 	jobId, err := workerTube.Put(jsonReq, 0, 0, (3600 * time.Second))
