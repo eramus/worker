@@ -31,7 +31,7 @@ var first = func(req *worker.Request) (res worker.Response) {
 		B: 2,
 	}
 
-	resp, err := worker.Send(secondTube, s, "second")
+	resp, err := worker.Send(secondTube, s, true)
 	if err != nil {
 		log.Println("err:", err)
 	}
@@ -70,7 +70,7 @@ func main() {
 		A: 2,
 	}
 
-	resp, err := worker.Send(firstTube, a, "first")
+	resp, err := worker.Send(firstTube, a, true)
 	if err != nil {
 		log.Println("err:", err)
 		return

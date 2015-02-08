@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// send it to our worker
-	_, err := worker.Send(addTube, a, "")
+	_, err := worker.Send(addTube, a, false)
 	if err != nil {
 		log.Println("err:", err)
 	}

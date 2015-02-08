@@ -40,7 +40,7 @@ func main() {
 		B: 2,
 	}
 
-	resp, err := worker.Send(addResponseTube, a, "abc")
+	resp, err := worker.Send(addResponseTube, a, true)
 	if err != nil {
 		log.Println("err:", err)
 		return

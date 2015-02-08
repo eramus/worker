@@ -11,12 +11,12 @@ import (
 // Send a unit of work to a worker. 'workerTube' determines the
 // tube that will respond to incoming work. 'requestId' is an
 // optional parameter for delivering responses back to the caller
-func Send(tube string, data interface{}, requestId string) ([]byte, error) {
+func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
 	// put together our request data
 	reqData := make(map[string]interface{}, 2)
 	reqData["data"] = data
-	if len(requestId) > 0 {
-		reqData["request"] = requestId
+	if feedback {
+		reqData["feedback"] = true
 	}
 
 	// marshal the data into a payload
@@ -36,18 +36,18 @@ func Send(tube string, data interface{}, requestId string) ([]byte, error) {
 	workerTube := beanstalk.Tube{beanConn, getRequestTube(tube)}
 
 	// send it
-	_, err = workerTube.Put(jsonReq, 0, 0, (3600 * time.Second))
+	jobId, err := workerTube.Put(jsonReq, 0, 0, (3600 * time.Second))
 	if err != nil {
 		return nil, ErrUnableToSend
 	}
 
 	// no response -- all done with the send
-	if requestId == "" {
+	if !feedback {
 		return nil, nil
 	}
 
 	var (
-		watch = beanstalk.NewTubeSet(beanConn, getResponseTube(tube, requestId))
+		watch = beanstalk.NewTubeSet(beanConn, getResponseTube(tube, jobId))
 		retry = 5
 		id    uint64
 		msg   []byte
@@ -55,7 +55,7 @@ func Send(tube string, data interface{}, requestId string) ([]byte, error) {
 
 	// wait for a response from the worker
 	for {
-		id, msg, err = watch.Reserve(defaultReserve)
+		id, msg, err = watch.Reserve(responsetime)
 		if err != nil {
 			cerr, ok := err.(beanstalk.ConnError)
 			if ok && cerr.Err == beanstalk.ErrTimeout {

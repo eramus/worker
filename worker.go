@@ -37,6 +37,13 @@ const (
 	ReleaseJob
 )
 
+type result struct {
+	result   Result
+	jobId    uint64
+	priority uint32
+	delay    time.Duration
+}
+
 // The function that will be performed against a unit of work.
 type WorkerFunc func(*Request) Response
 
@@ -51,15 +58,25 @@ type Response struct {
 
 // A unit of work that is passed to a WorkerFunc
 type Request struct {
-	jobId     uint64
-	RequestId string          `json:"request"`
-	Data      json.RawMessage `json:"data"`
+	id       uint64          `json:"-"`
+	Data     json.RawMessage `json:"data"`
+	Feedback bool            `json:"feedback"`
 }
 
 var beanstalkHost = "0.0.0.0:11300"
+var reserveTime = (100 * time.Millisecond)
+var responsetime = (2 * time.Second)
 
 func SetHost(host string) {
 	beanstalkHost = host
+}
+
+func SetReserveTime(t time.Duration) {
+	reserveTime = t
+}
+
+func SetResponseTime(t time.Duration) {
+	responsetime = t
 }
 
 // Helper function for retrying a job. This accepts an error and a
@@ -83,7 +100,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 	}
 	defer beanConn.Close()
 
-	stats, statsErr := beanConn.StatsJob(r.jobId)
+	stats, statsErr := beanConn.StatsJob(r.id)
 	if statsErr != nil {
 		// send it back as retry = 1
 		return Response{
@@ -142,29 +159,9 @@ func (r *Request) DeleteJob(err error) Response {
 
 // helpers for getting communication tubes
 func getRequestTube(workerTube string) string {
-	return fmt.Sprintf("%s_request", workerTube)
+	return fmt.Sprintf("%s", workerTube)
 }
 
-func getResponseTube(workerTube string, requestId string) string {
-	return fmt.Sprintf("%s_%s_response", workerTube, requestId)
-}
-
-// An interface for generating request ids. This is needed
-// when dealing with workers that act synchronously.
-type RequestIdGenerator interface {
-	GetRequestId() (string, error)
-}
-
-var requestIdGenerator RequestIdGenerator
-
-// Helper for setting the RequestIdGenerator for a, or a collection
-// of, worker
-func SetRequestIdGenerator(gen RequestIdGenerator) {
-	requestIdGenerator = gen
-}
-
-// Helper for getting a request id that can be used for
-// returning finished work responses.
-func GetRequestId() (string, error) {
-	return requestIdGenerator.GetRequestId()
+func getResponseTube(workerTube string, jobId uint64) string {
+	return fmt.Sprintf("%s_%d", workerTube, jobId)
 }
