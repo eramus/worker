@@ -89,7 +89,7 @@ func (w *worker) sendFeedback(job *Request, jsonRes []byte) error {
 	return nil
 }
 
-func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
+func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 	// catch a worker that has paniced
 	defer func() {
 		r := recover()
@@ -103,11 +103,11 @@ func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
 
 	for {
 		job, ok := <-jobs
-		if !ok && job == nil {
+		if !ok {
 			return
 		}
 
-		out := w.workerFunc(job)
+		out := w.workerFunc(&job)
 
 		res := result{
 			result: out.Result,
@@ -131,12 +131,13 @@ func (w *worker) work(jobs <-chan *Request, done chan<- struct{}) {
 			}
 
 			// send back a response
-			err = w.sendFeedback(job, jsonRes)
+			err = w.sendFeedback(&job, jsonRes)
 			if err != nil {
 				panic(fmt.Sprintf("worker response err: %s", err))
 			}
 		}
 
+		// send back the work results
 		w.control.completed <- res
 	}
 }
@@ -149,7 +150,7 @@ func (w *worker) run(started chan<- struct{}) {
 	defer beanConn.Close()
 
 	// worker comm channels
-	jobs := make(chan *Request)
+	jobs := make(chan Request)
 	done := make(chan struct{})
 
 	defer func() {
@@ -197,16 +198,21 @@ func (w *worker) run(started chan<- struct{}) {
 				log.Printf("Releasing job for: %s Id: %d %s\n", res.delay.String(), res.jobId)
 			}
 			jobCnt--
+		default:
+		}
+
+		if !running {
+			<-time.After(1 * time.Millisecond)
+			continue
+		}
+
+		select {
 		case <-w.control.dead:
 			// a worker died -- start up a new one
 			go w.work(jobs, done)
 			continue
 		case _, ok := <-w.control.shutdown:
 			if !ok {
-				if !running {
-					<-time.After(1 * time.Millisecond)
-					continue
-				}
 				// we need to shutdown
 				running = false
 				continue
@@ -225,9 +231,9 @@ func (w *worker) run(started chan<- struct{}) {
 			}
 		}
 
-		job := &Request{}
 		// unmarshal the work payload
-		err = json.Unmarshal(msg, job)
+		job := Request{}
+		err = json.Unmarshal(msg, &job)
 		if err != nil {
 			beanConn.Delete(id)
 			continue
@@ -235,10 +241,10 @@ func (w *worker) run(started chan<- struct{}) {
 		job.id = id
 
 		jobCnt++
-		go func() {
+		go func(j Request) {
 			// send it off!
-			jobs <- job
-		}()
+			jobs <- j
+		}(job)
 	}
 }
 
