@@ -40,6 +40,10 @@ var defaultOptions = &Options{
 	TTR:      defaultTTR,
 }
 
+func GetDefaults() Options {
+	return *defaultOptions
+}
+
 // A function for determining the amount of delay that should be
 // used each time a job is released.
 type DelayDecay func(int) int
