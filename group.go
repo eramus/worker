@@ -4,7 +4,7 @@ import "sync"
 
 // WorkerGroup is a protected map of workers. This also provides functions
 // for starting and stopping groups of workers. This saves the trouble of
-// needing to handle shutting down larges groups of workers.
+// needing to handle starting and shutting down larges groups of workers.
 type WorkerGroup interface {
 	Add(string, WorkerFunc)
 	Remove(string) Worker
@@ -19,6 +19,7 @@ type workerGroup struct {
 }
 
 // Return an initalized WorkerGroup for controlling workers as a group.
+// If options is nil, the default beanstalkd options will be used.
 func NewWorkerGroup(options *Options) WorkerGroup {
 	if options == nil {
 		options = defaultOptions
@@ -32,8 +33,7 @@ func NewWorkerGroup(options *Options) WorkerGroup {
 	return wg
 }
 
-// Add a worker to the group of workers. The name given must be unique to
-// avoid a panic.
+// Add a worker to the group of workers.
 func (wg *workerGroup) Add(tube string, workerFunc WorkerFunc) {
 	wg.Lock()
 	defer wg.Unlock()
@@ -48,7 +48,7 @@ func (wg *workerGroup) Add(tube string, workerFunc WorkerFunc) {
 }
 
 // Remove will remove the named worker from the group. The worker is
-// returned if it is found.
+// returned if it is found. It is not shutdown.
 func (wg *workerGroup) Remove(tube string) Worker {
 	wg.Lock()
 	defer wg.Unlock()

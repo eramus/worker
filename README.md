@@ -50,7 +50,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 // are combined for this example.
 func main() {
 	// define and run a worker
-	add := worker.NewWorker(addTube, add, 10)
+	add := worker.NewWorker(addTube, add, nil)
 	add.Run()
 
 	// shutdown the worker on exit
@@ -61,13 +61,13 @@ func main() {
 	}()
 
 	// create a unit of work
-	a := &addData{
+	a := addData{
 		A: 2,
 		B: 2,
 	}
 
 	// send it to our worker
-	_, err := worker.Send(addTube, a, "")
+	_, err := worker.Send(addTube, a, false, nil)
 	if err != nil {
 		log.Println("err:", err)
 	}
@@ -79,6 +79,7 @@ func main() {
 ```go
 type Worker interface {
 	Run()
+	Running() bool
 	Shutdown(chan<- struct{})
 }
 ```
@@ -86,10 +87,10 @@ type Worker interface {
 This interface is used to hide the implementation of the base package from the caller. This exposes just enough functionality to keep working with and defining a worker simple. ```Run``` will block until all worker instances have been launched. ```Shutdown``` does not block so that multiple workers can be shutdown at the same time. ```Shutdown``` accepts an optional channel that can be used to signal the main caller that the shutdown was completed successfully.
 
 ```go
-func NewWorker(tube string, workerFunc WorkerFunc, cnt int) Worker {
+func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker
 ```
 
-```NewWorker``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```cnt``` is a non-zero number that represents how many instances of a worker will be launched when ```Run``` is called. ```cnt``` must be non-zero to avoid a panic.
+```NewWorker``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```options``` is an optional parameter for configuring the underlying beanstalkd connection and number of worker routines that will be spawned.
 
 ```go
 type WorkerFunc func(*Request) Response
@@ -98,10 +99,10 @@ type WorkerFunc func(*Request) Response
 The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response``` -- easy as that. What you do inside is completely up to you. Take a look at the examples directory for some ideas.
 
 ```go
-func Send(workerTube string, data interface{}, requestId string) ([]byte, error)
+func Send(tube string, data interface{}, feedback bool, options *Options) ([]byte, error)
 ```
 
-This can be used for sending work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. The ```requestId``` is an optional parameter that signals ```Send``` that a response from the worker is expected. Raw json is returned for requests that expect responses.
+This can be used for sending work requests to your workers. Data is marshalled to a json string before being sent across beanstalk. ```feedback``` determines if this should return a response from the worker. ```options``` is an optional parameter for configuring the underlying beanstalkd connection. Raw json is returned for requests that expect responses.
 
 ```go
 type DelayDecay func(int) int
@@ -127,17 +128,6 @@ func (r *Request) DeleteJob(err error) Response
 
 ```DeleteJob``` is used for cases that a work request should just be deleted on error.
 
-```go
-type RequestIdGenerator interface {
-	GetRequestId() (string, error)
-}
-```
-
-An interface that generates request ids for work requests. These are typically used for callers that require a response from the worker. This could be a simple incrementer, a UUID generator or something more complex involving an outside service. I like to use noeqd (https://github.com/noeq/noeqd).
-
 ## TODO ##
 
-* Better connection handling to beanstalkd. An internal connection pool perhaps?
-* A default request id generator
-* More flexibility for sending work requests: fire-and-forget, response handlers, etc.
 * tests!

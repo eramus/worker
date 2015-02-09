@@ -8,8 +8,10 @@ import (
 )
 
 // Send a unit of work to a worker. 'workerTube' determines the
-// tube that will respond to incoming work. 'requestId' is an
-// optional parameter for delivering responses back to the caller
+// tube that will respond to incoming work. 'feedback' is lets the caller
+// determine if a response is expected. 'options' is an optional parameter
+// to configure the beanstalkd interaction, otherwise, the default options
+// will be used.
 func Send(tube string, data interface{}, feedback bool, options *Options) ([]byte, error) {
 	if options == nil {
 		options = defaultOptions

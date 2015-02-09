@@ -3,10 +3,6 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/eramus/worker"
 )
@@ -44,32 +40,18 @@ func main() {
 		B: 2,
 	}
 
-	var shutdown = make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	for {
-		go func() {
-			resp, err := worker.Send(addResponseTube, a, true, nil)
-			if err != nil {
-				log.Println("err:", err)
-				return
-			}
-
-			var data int
-			err = json.Unmarshal(resp, &data)
-			if err != nil {
-				log.Println("err:", err)
-				return
-			}
-
-			log.Println("2 + 2 =", data)
-		}()
-
-		select {
-		case <-shutdown:
-			return
-		default:
-			<-time.After((2 * time.Millisecond))
-		}
+	resp, err := worker.Send(addResponseTube, a, true, nil)
+	if err != nil {
+		log.Println("err:", err)
+		return
 	}
+
+	var data int
+	err = json.Unmarshal(resp, &data)
+	if err != nil {
+		log.Println("err:", err)
+		return
+	}
+
+	log.Println("2 + 2 =", data)
 }

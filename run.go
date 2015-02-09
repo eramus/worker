@@ -10,7 +10,7 @@ import (
 )
 
 // Worker contains the exported parts of a worker. This allows
-// the specifics about managing a worker to beleft up to the package.
+// the specifics about managing a worker to be left up to the package.
 type Worker interface {
 	Run()
 	Running() bool
@@ -35,7 +35,9 @@ type control struct {
 }
 
 // NewWorker will return a Worker interface that can be used
-// to control the underlying worker.
+// to control the underlying worker. If options is nil, the
+// default beanstalkd options will be used.
+// TODO: better option handling
 func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker {
 	if options == nil {
 		options = defaultOptions
@@ -53,7 +55,7 @@ func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker {
 }
 
 // After a worker has been created, it can be started with the
-// Run function. This will block until all of the worker instances
+// Run function. This will block until all of the workers
 // have been started.
 func (w *worker) Run() {
 	if w.running {

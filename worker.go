@@ -22,6 +22,8 @@ var (
 	defaultTTR     = (3600 * time.Second)
 )
 
+// Common beanstalkd options that are used by
+// this package.
 type Options struct {
 	Host     string
 	Count    int
@@ -40,6 +42,7 @@ var defaultOptions = &Options{
 	TTR:      defaultTTR,
 }
 
+// Get a copy of the default options.
 func GetDefaults() Options {
 	return *defaultOptions
 }
@@ -72,7 +75,7 @@ type result struct {
 // The function that will be performed against a unit of work.
 type WorkerFunc func(*Request) Response
 
-// A container that describes the result of a consuming a unit
+// A container that describes the result of consuming a unit
 // of work.
 type Response struct {
 	Result Result      `json:"-"`
