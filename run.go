@@ -21,7 +21,8 @@ type worker struct {
 	tube       string
 	workerFunc WorkerFunc
 	count      int
-	shutdown   chan struct{}
+	host       string
+	reserve    time.Duration
 	control    control
 	running    bool
 }
@@ -35,16 +36,17 @@ type control struct {
 
 // NewWorker will return a Worker interface that can be used
 // to control the underlying worker.
-func NewWorker(tube string, workerFunc WorkerFunc, cnt int) Worker {
-	if cnt < 1 {
-		panic("need to create atleast one worker")
+func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker {
+	if options == nil {
+		options = defaultOptions
 	}
 
 	w := &worker{
 		tube:       tube,
 		workerFunc: workerFunc,
-		count:      cnt,
-		shutdown:   make(chan struct{}),
+		host:       options.Host,
+		count:      options.Count,
+		reserve:    options.Reserve,
 	}
 
 	return w
@@ -75,9 +77,9 @@ func (w *worker) Run() {
 }
 
 func (w *worker) sendFeedback(job *Request, jsonRes []byte) error {
-	beanConn, err := beanstalk.Dial("tcp", beanstalkHost)
+	beanConn, err := beanstalk.Dial("tcp", w.host)
 	if err != nil {
-		return err
+		return ErrBeanstalkConnect
 	}
 	defer beanConn.Close()
 
@@ -143,17 +145,18 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 }
 
 func (w *worker) run(started chan<- struct{}) {
-	beanConn, err := beanstalk.Dial("tcp", beanstalkHost)
+	beanConn, err := beanstalk.Dial("tcp", w.host)
 	if err != nil {
 		panic(fmt.Sprintf("dial err: %s", err))
 	}
-	defer beanConn.Close()
 
 	// worker comm channels
 	jobs := make(chan Request)
 	done := make(chan struct{})
 
 	defer func() {
+		// close the conn
+		beanConn.Close()
 		// shutdown the workers
 		close(jobs)
 		// wait for them to stop
@@ -221,7 +224,7 @@ func (w *worker) run(started chan<- struct{}) {
 		}
 
 		// get some work
-		id, msg, err := watch.Reserve(reserveTime)
+		id, msg, err := watch.Reserve(w.reserve)
 		if err != nil {
 			cerr, ok := err.(beanstalk.ConnError)
 			if ok && cerr.Err == beanstalk.ErrTimeout {
@@ -239,6 +242,7 @@ func (w *worker) run(started chan<- struct{}) {
 			continue
 		}
 		job.id = id
+		job.host = w.host
 
 		jobCnt++
 		go func(j Request) {

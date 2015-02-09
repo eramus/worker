@@ -3,6 +3,10 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/eramus/worker"
 )
@@ -31,7 +35,7 @@ var first = func(req *worker.Request) (res worker.Response) {
 		B: 2,
 	}
 
-	resp, err := worker.Send(secondTube, s, true)
+	resp, err := worker.Send(secondTube, s, true, nil)
 	if err != nil {
 		log.Println("err:", err)
 	}
@@ -59,9 +63,10 @@ var second = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	wg := worker.NewWorkerGroup()
-	wg.Add("first", worker.NewWorker(firstTube, first, 1))
-	wg.Add("second", worker.NewWorker(secondTube, second, 1))
+	wg := worker.NewWorkerGroup(nil)
+
+	wg.Add(firstTube, first)
+	wg.Add(secondTube, second)
 
 	wg.Run()
 	defer wg.Shutdown()
@@ -70,18 +75,31 @@ func main() {
 		A: 2,
 	}
 
-	resp, err := worker.Send(firstTube, a, true)
-	if err != nil {
-		log.Println("err:", err)
-		return
+	var shutdown = make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	for {
+		resp, err := worker.Send(firstTube, a, true, nil)
+		if err != nil {
+			log.Println("err:", err)
+			return
+		}
+
+		var data int
+		err = json.Unmarshal(resp, &data)
+		if err != nil {
+			log.Println("err:", err)
+			return
+		}
+
+		log.Println("2 + 2 =", data)
+
+		select {
+		case <-shutdown:
+			return
+		default:
+			<-time.After((2 * time.Millisecond))
+		}
 	}
 
-	var data int
-	err = json.Unmarshal(resp, &data)
-	if err != nil {
-		log.Println("err:", err)
-		return
-	}
-
-	log.Println("2 + 2 =", data)
 }

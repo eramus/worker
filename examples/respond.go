@@ -3,6 +3,10 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/eramus/worker"
 )
@@ -26,7 +30,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	add := worker.NewWorker(addResponseTube, add, 1)
+	add := worker.NewWorker(addResponseTube, add, nil)
 	add.Run()
 
 	defer func() {
@@ -40,18 +44,32 @@ func main() {
 		B: 2,
 	}
 
-	resp, err := worker.Send(addResponseTube, a, true)
-	if err != nil {
-		log.Println("err:", err)
-		return
-	}
+	var shutdown = make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	var data int
-	err = json.Unmarshal(resp, &data)
-	if err != nil {
-		log.Println("err:", err)
-		return
-	}
+	for {
+		go func() {
+			resp, err := worker.Send(addResponseTube, a, true, nil)
+			if err != nil {
+				log.Println("err:", err)
+				return
+			}
 
-	log.Println("2 + 2 =", data)
+			var data int
+			err = json.Unmarshal(resp, &data)
+			if err != nil {
+				log.Println("err:", err)
+				return
+			}
+
+			log.Println("2 + 2 =", data)
+		}()
+
+		select {
+		case <-shutdown:
+			return
+		default:
+			<-time.After((2 * time.Millisecond))
+		}
+	}
 }

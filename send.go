@@ -3,7 +3,6 @@ package worker
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/kr/beanstalk"
 )
@@ -11,7 +10,11 @@ import (
 // Send a unit of work to a worker. 'workerTube' determines the
 // tube that will respond to incoming work. 'requestId' is an
 // optional parameter for delivering responses back to the caller
-func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
+func Send(tube string, data interface{}, feedback bool, options *Options) ([]byte, error) {
+	if options == nil {
+		options = defaultOptions
+	}
+
 	// put together our request data
 	reqData := make(map[string]interface{}, 2)
 	reqData["data"] = data
@@ -26,7 +29,7 @@ func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
 	}
 
 	// connect to beanstalkd
-	beanConn, err := beanstalk.Dial("tcp", beanstalkHost)
+	beanConn, err := beanstalk.Dial("tcp", options.Host)
 	if err != nil {
 		return nil, ErrBeanstalkConnect
 	}
@@ -36,7 +39,7 @@ func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
 	workerTube := beanstalk.Tube{beanConn, tube}
 
 	// send it
-	jobId, err := workerTube.Put(jsonReq, 0, 0, (3600 * time.Second))
+	jobId, err := workerTube.Put(jsonReq, options.Priority, options.Delay, options.TTR)
 	if err != nil {
 		return nil, ErrUnableToSend
 	}
@@ -55,7 +58,7 @@ func Send(tube string, data interface{}, feedback bool) ([]byte, error) {
 
 	// wait for a response from the worker
 	for {
-		id, msg, err = watch.Reserve(responsetime)
+		id, msg, err = watch.Reserve(options.Reserve)
 		if err != nil {
 			cerr, ok := err.(beanstalk.ConnError)
 			if ok && cerr.Err == beanstalk.ErrTimeout {

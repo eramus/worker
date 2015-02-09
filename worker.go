@@ -15,7 +15,30 @@ var (
 	ErrJsonMarshal      = errors.New("json marshal")
 	ErrUnableToSend     = errors.New("unable to send json")
 	ErrNoResponse       = errors.New("did not receive a response")
+
+	defaultHost    = "0.0.0.0:11300"
+	defaultReserve = (2 * time.Second)
+	defaultDelay   = time.Duration(0)
+	defaultTTR     = (3600 * time.Second)
 )
+
+type Options struct {
+	Host     string
+	Count    int
+	Reserve  time.Duration
+	Priority uint32
+	Delay    time.Duration
+	TTR      time.Duration
+}
+
+var defaultOptions = &Options{
+	Host:     defaultHost,
+	Count:    1,
+	Reserve:  defaultReserve,
+	Priority: 0,
+	Delay:    defaultDelay,
+	TTR:      defaultTTR,
+}
 
 // A function for determining the amount of delay that should be
 // used each time a job is released.
@@ -24,8 +47,6 @@ type DelayDecay func(int) int
 var defaultDecay = func(retries int) int {
 	return 1
 }
-
-var defaultReserve = (2 * time.Second)
 
 // The result of a job
 type Result int
@@ -59,24 +80,9 @@ type Response struct {
 // A unit of work that is passed to a WorkerFunc
 type Request struct {
 	id       uint64          `json:"-"`
+	host     string          `json:"-"`
 	Data     json.RawMessage `json:"data"`
 	Feedback bool            `json:"feedback"`
-}
-
-var beanstalkHost = "0.0.0.0:11300"
-var reserveTime = (2 * time.Second)
-var responsetime = (2 * time.Second)
-
-func SetHost(host string) {
-	beanstalkHost = host
-}
-
-func SetReserveTime(t time.Duration) {
-	reserveTime = t
-}
-
-func SetResponseTime(t time.Duration) {
-	responsetime = t
 }
 
 // Helper function for retrying a job. This accepts an error and a
@@ -89,7 +95,7 @@ func (r *Request) RetryJob(err error, maxRetries int, delay DelayDecay) Response
 		delay = defaultDecay
 	}
 
-	beanConn, dialErr := beanstalk.Dial("tcp", beanstalkHost)
+	beanConn, dialErr := beanstalk.Dial("tcp", r.host)
 	if dialErr != nil {
 		// send it back as retry = 1
 		return Response{
