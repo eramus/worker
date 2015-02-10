@@ -29,7 +29,6 @@ type worker struct {
 type control struct {
 	completed chan result
 	shutdown  chan struct{}
-	finished  chan struct{}
 	dead      chan struct{}
 }
 
@@ -64,7 +63,6 @@ func (w *worker) Run() {
 	w.control = control{
 		completed: make(chan result),
 		shutdown:  make(chan struct{}),
-		finished:  make(chan struct{}),
 		dead:      make(chan struct{}),
 	}
 
@@ -165,7 +163,7 @@ func (w *worker) run(started chan<- struct{}) {
 			case <-w.control.dead:
 			}
 		}
-		w.control.finished <- struct{}{}
+		close(w.control.shutdown)
 	}()
 
 	// start up our workers
@@ -213,12 +211,10 @@ func (w *worker) run(started chan<- struct{}) {
 			// a worker died -- start up a new one
 			go w.work(jobs, done)
 			continue
-		case _, ok := <-w.control.shutdown:
-			if !ok {
-				// we need to shutdown
-				running = false
-				continue
-			}
+		case <-w.control.shutdown:
+			// we need to shutdown
+			running = false
+			continue
 		default:
 		}
 
@@ -267,9 +263,9 @@ func (w *worker) Shutdown(finished chan<- struct{}) {
 	// run this in a go routine so it doesnt block
 	go func(f chan<- struct{}) {
 		// close everything down and wait for checkins
-		close(w.control.shutdown)
+		w.control.shutdown <- struct{}{}
+		<-w.control.shutdown
 
-		<-w.control.finished
 		w.running = false
 
 		if f != nil {
