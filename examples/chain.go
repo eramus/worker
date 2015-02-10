@@ -59,7 +59,7 @@ var second = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	wg := worker.NewWorkerGroup(nil)
+	wg := worker.NewGroup(nil)
 
 	wg.Add(firstTube, first)
 	wg.Add(secondTube, second)

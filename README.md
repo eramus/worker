@@ -50,7 +50,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 // are combined for this example.
 func main() {
 	// define and run a worker
-	add := worker.NewWorker(addTube, add, nil)
+	add := worker.New(addTube, add, nil)
 	add.Run()
 
 	// shutdown the worker on exit

@@ -36,7 +36,7 @@ type control struct {
 // to control the underlying worker. If options is nil, the
 // default beanstalkd options will be used.
 // TODO: better option handling
-func NewWorker(tube string, workerFunc Func, options *Options) Worker {
+func New(tube string, workerFunc Func, options *Options) Worker {
 	if options == nil {
 		options = defaultOptions
 	}
