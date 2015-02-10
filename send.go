@@ -3,6 +3,8 @@ package worker
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
+	"time"
 
 	"github.com/kr/beanstalk"
 )
@@ -18,14 +20,16 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	}
 
 	// put together our request data
-	reqData := make(map[string]interface{}, 2)
-	reqData["data"] = data
-	if feedback {
-		reqData["feedback"] = true
+	req := &struct {
+		Data     interface{} `json:"data"`
+		Feedback bool        `json:"feedback"`
+	}{
+		Data:     data,
+		Feedback: feedback,
 	}
 
 	// marshal the data into a payload
-	jsonReq, err := json.Marshal(reqData)
+	jsonReq, err := json.Marshal(req)
 	if err != nil {
 		return nil, ErrJsonMarshal
 	}
@@ -52,10 +56,11 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	}
 
 	var (
-		watch = beanstalk.NewTubeSet(beanConn, getResponseTube(tube, jobId))
-		retry = 5
-		id    uint64
-		msg   []byte
+		resTube = tube + "_" + strconv.FormatUint(jobId, 10)
+		watch   = beanstalk.NewTubeSet(beanConn, resTube)
+		id      uint64
+		msg     []byte
+		start   = time.Now()
 	)
 
 	// wait for a response from the worker
@@ -64,10 +69,9 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 		if err != nil {
 			cerr, ok := err.(beanstalk.ConnError)
 			if ok && cerr.Err == beanstalk.ErrTimeout {
-				if retry == 0 {
+				if time.Since(start) > options.Wait {
 					return nil, ErrNoResponse
 				}
-				retry--
 				continue
 			} else {
 				return nil, err

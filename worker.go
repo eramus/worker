@@ -3,7 +3,6 @@ package worker
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -15,11 +14,6 @@ var (
 	ErrJsonMarshal      = errors.New("json marshal")
 	ErrUnableToSend     = errors.New("unable to send json")
 	ErrNoResponse       = errors.New("did not receive a response")
-
-	defaultHost    = "0.0.0.0:11300"
-	defaultReserve = (2 * time.Second)
-	defaultDelay   = time.Duration(0)
-	defaultTTR     = (3600 * time.Second)
 )
 
 // Common beanstalkd options that are used by
@@ -31,15 +25,17 @@ type Options struct {
 	Priority uint32
 	Delay    time.Duration
 	TTR      time.Duration
+	Wait     time.Duration
 }
 
 var defaultOptions = &Options{
-	Host:     defaultHost,
+	Host:     "0.0.0.0:11300",
 	Count:    1,
-	Reserve:  defaultReserve,
+	Reserve:  (2 * time.Second),
 	Priority: 0,
-	Delay:    defaultDelay,
-	TTR:      defaultTTR,
+	Delay:    time.Duration(0),
+	TTR:      (3600 * time.Second),
+	Wait:     (10 * time.Second),
 }
 
 // Get a copy of the default options.
@@ -49,10 +45,10 @@ func GetDefaults() Options {
 
 // A function for determining the amount of delay that should be
 // used each time a job is released.
-type DelayDecay func(int) int
+type DelayDecay func(int) time.Duration
 
-var defaultDecay = func(retries int) int {
-	return 1
+var defaultDecay = func(retries int) time.Duration {
+	return time.Second
 }
 
 // The result of a job
@@ -78,10 +74,10 @@ type WorkerFunc func(*Request) Response
 // A container that describes the result of consuming a unit
 // of work.
 type Response struct {
-	Result Result      `json:"-"`
-	Data   interface{} `json:"data"`
-	Error  string      `json:"error"`
-	Delay  int         `json:"-"`
+	Result Result        `json:"-"`
+	Data   interface{}   `json:"data"`
+	Error  string        `json:"error"`
+	Delay  time.Duration `json:"-"`
 }
 
 // A unit of work that is passed to a WorkerFunc
@@ -168,9 +164,4 @@ func (r *Request) DeleteJob(err error) Response {
 		Result: DeleteJob,
 		Error:  err.Error(),
 	}
-}
-
-// helper for getting response tubes
-func getResponseTube(workerTube string, jobId uint64) string {
-	return fmt.Sprintf("%s_%d", workerTube, jobId)
 }

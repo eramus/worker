@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/kr/beanstalk"
@@ -20,9 +21,7 @@ type Worker interface {
 type worker struct {
 	tube       string
 	workerFunc WorkerFunc
-	count      int
-	host       string
-	reserve    time.Duration
+	options    *Options
 	control    control
 	running    bool
 }
@@ -46,9 +45,7 @@ func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker {
 	w := &worker{
 		tube:       tube,
 		workerFunc: workerFunc,
-		host:       options.Host,
-		count:      options.Count,
-		reserve:    options.Reserve,
+		options:    options,
 	}
 
 	return w
@@ -79,14 +76,14 @@ func (w *worker) Run() {
 }
 
 func (w *worker) sendFeedback(job *Request, jsonRes []byte) error {
-	beanConn, err := beanstalk.Dial("tcp", w.host)
+	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
 	if err != nil {
 		return ErrBeanstalkConnect
 	}
 	defer beanConn.Close()
 
-	beanConn.Tube.Name = getResponseTube(w.tube, job.id)
-	_, err = beanConn.Put(jsonRes, 0, 0, (3600 * time.Second))
+	beanConn.Tube.Name = w.tube + "_" + strconv.FormatUint(job.id, 10)
+	_, err = beanConn.Put(jsonRes, w.options.Priority, w.options.Delay, w.options.TTR)
 	if err != nil {
 		return err
 	}
@@ -123,7 +120,7 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 			res.priority = 1
 		case ReleaseJob:
 			res.priority = 1
-			res.delay = time.Duration(out.Delay) * time.Second
+			res.delay = out.Delay
 		default:
 		}
 
@@ -147,7 +144,7 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 }
 
 func (w *worker) run(started chan<- struct{}) {
-	beanConn, err := beanstalk.Dial("tcp", w.host)
+	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
 	if err != nil {
 		panic(fmt.Sprintf("dial err: %s", err))
 	}
@@ -162,7 +159,7 @@ func (w *worker) run(started chan<- struct{}) {
 		// shutdown the workers
 		close(jobs)
 		// wait for them to stop
-		for i := 0; i < w.count; i++ {
+		for i := 0; i < w.options.Count; i++ {
 			select {
 			case <-done:
 			case <-w.control.dead:
@@ -172,7 +169,7 @@ func (w *worker) run(started chan<- struct{}) {
 	}()
 
 	// start up our workers
-	for i := 0; i < w.count; i++ {
+	for i := 0; i < w.options.Count; i++ {
 		go w.work(jobs, done)
 	}
 
@@ -207,7 +204,7 @@ func (w *worker) run(started chan<- struct{}) {
 		}
 
 		if !running {
-			<-time.After(1 * time.Millisecond)
+			<-time.After(250 * time.Millisecond)
 			continue
 		}
 
@@ -226,7 +223,7 @@ func (w *worker) run(started chan<- struct{}) {
 		}
 
 		// get some work
-		id, msg, err := watch.Reserve(w.reserve)
+		id, msg, err := watch.Reserve(w.options.Reserve)
 		if err != nil {
 			cerr, ok := err.(beanstalk.ConnError)
 			if ok && cerr.Err == beanstalk.ErrTimeout {
@@ -244,7 +241,7 @@ func (w *worker) run(started chan<- struct{}) {
 			continue
 		}
 		job.id = id
-		job.host = w.host
+		job.host = w.options.Host
 
 		jobCnt++
 		go func(j Request) {
