@@ -87,13 +87,13 @@ type Worker interface {
 This interface is used to hide the implementation of the base package from the caller. This exposes just enough functionality to keep working with and defining a worker simple. ```Run``` will block until all worker instances have been launched. ```Shutdown``` does not block so that multiple workers can be shutdown at the same time. ```Shutdown``` accepts an optional channel that can be used to signal the main caller that the shutdown was completed successfully.
 
 ```go
-func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker
+func New(tube string, workerFunc Func, options *Options) Worker
 ```
 
-```NewWorker``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```options``` is an optional parameter for configuring the underlying beanstalkd connection and number of worker routines that will be spawned.
+```New``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```options``` is an optional parameter for configuring the underlying beanstalkd connection and number of worker routines that will be spawned.
 
 ```go
-type WorkerFunc func(*Request) Response
+type Func func(*Request) Response
 ```
 
 The expected worker function definition. Your functions should accept a ```Request``` and return a ```Response``` -- easy as that. What you do inside is completely up to you. Take a look at the examples directory for some ideas.
