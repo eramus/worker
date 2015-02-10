@@ -2,69 +2,69 @@ package worker
 
 import "sync"
 
-// WorkerGroup is a protected map of workers. This also provides functions
+// group is a protected map of workers. This also provides functions
 // for starting and stopping groups of workers. This saves the trouble of
 // needing to handle starting and shutting down larges groups of workers.
-type WorkerGroup interface {
-	Add(string, WorkerFunc)
+type Group interface {
+	Add(string, Func)
 	Remove(string) Worker
 	Run()
 	Shutdown()
 }
 
-type workerGroup struct {
+type group struct {
 	sync.RWMutex
 	workers map[string]Worker
 	options *Options
 }
 
-// Return an initalized WorkerGroup for controlling workers as a group.
+// Return an initalized Group for controlling workers as a group.
 // If options is nil, the default beanstalkd options will be used.
-func NewWorkerGroup(options *Options) WorkerGroup {
+func NewGroup(options *Options) Group {
 	if options == nil {
 		options = defaultOptions
 	}
 
-	wg := &workerGroup{
+	g := &group{
 		workers: make(map[string]Worker),
 		options: options,
 	}
 
-	return wg
+	return g
 }
 
 // Add a worker to the group of workers.
-func (wg *workerGroup) Add(tube string, workerFunc WorkerFunc) {
-	wg.Lock()
-	defer wg.Unlock()
+func (g *group) Add(tube string, workerFunc Func) {
+	g.Lock()
+	defer g.Unlock()
 
-	_, ok := wg.workers[tube]
+	_, ok := g.workers[tube]
 	if ok {
 		panic("worker name must be unique")
 	}
 
-	w := NewWorker(tube, workerFunc, wg.options)
-	wg.workers[tube] = w
+	w := NewWorker(tube, workerFunc, g.options)
+	g.workers[tube] = w
 }
 
 // Remove will remove the named worker from the group. The worker is
 // returned if it is found. It is not shutdown.
-func (wg *workerGroup) Remove(tube string) Worker {
-	wg.Lock()
-	defer wg.Unlock()
+func (g *group) Remove(tube string) Worker {
+	g.Lock()
+	defer g.Unlock()
 
-	w := wg.workers[tube]
-	delete(wg.workers, tube)
+	w := g.workers[tube]
+	delete(g.workers, tube)
 	return w
 }
 
 // Run the group of workers.
-func (wg *workerGroup) Run() {
-	wg.RLock()
-	defer wg.RUnlock()
+func (g *group) Run() {
+	g.RLock()
+	defer g.RUnlock()
 
 	// kick it all off
-	for _, w := range wg.workers {
+	for _, w := range g.workers {
 		if w.Running() {
 			continue
 		}
@@ -73,21 +73,21 @@ func (wg *workerGroup) Run() {
 }
 
 // Shut down the group of workers
-func (wg *workerGroup) Shutdown() {
+func (g *group) Shutdown() {
 	f := make(chan struct{})
 
-	wg.Lock()
-	defer wg.Unlock()
+	g.Lock()
+	defer g.Unlock()
 
 	// start shutting them down
-	for _, w := range wg.workers {
+	for _, w := range g.workers {
 		w.Shutdown(f)
 	}
 	// wait for everyone to check in
-	for i := 0; i < len(wg.workers); i++ {
+	for i := 0; i < len(g.workers); i++ {
 		<-f
 	}
-	for t, _ := range wg.workers {
-		delete(wg.workers, t)
+	for t := range g.workers {
+		delete(g.workers, t)
 	}
 }

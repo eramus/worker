@@ -20,7 +20,7 @@ type Worker interface {
 
 type worker struct {
 	tube       string
-	workerFunc WorkerFunc
+	workerFunc Func
 	options    *Options
 	control    control
 	running    bool
@@ -36,7 +36,7 @@ type control struct {
 // to control the underlying worker. If options is nil, the
 // default beanstalkd options will be used.
 // TODO: better option handling
-func NewWorker(tube string, workerFunc WorkerFunc, options *Options) Worker {
+func NewWorker(tube string, workerFunc Func, options *Options) Worker {
 	if options == nil {
 		options = defaultOptions
 	}
@@ -110,7 +110,7 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 
 		res := result{
 			result: out.Result,
-			jobId:  job.id,
+			jobID:  job.id,
 		}
 
 		switch out.Result {
@@ -186,16 +186,16 @@ func (w *worker) run(started chan<- struct{}) {
 			// a worker is finished -- handle it
 			switch res.result {
 			case Success:
-				beanConn.Delete(res.jobId)
+				beanConn.Delete(res.jobID)
 			case BuryJob:
-				beanConn.Bury(res.jobId, res.priority)
-				log.Printf("Burying job. Id: %d\n", res.jobId)
+				beanConn.Bury(res.jobID, res.priority)
+				log.Printf("Burying job. Id: %d\n", res.jobID)
 			case DeleteJob:
-				beanConn.Delete(res.jobId)
-				log.Printf("Deleting job. Id: %d\n", res.jobId)
+				beanConn.Delete(res.jobID)
+				log.Printf("Deleting job. Id: %d\n", res.jobID)
 			case ReleaseJob:
-				beanConn.Release(res.jobId, res.priority, res.delay)
-				log.Printf("Releasing job for: %s Id: %d %s\n", res.delay.String(), res.jobId)
+				beanConn.Release(res.jobID, res.priority, res.delay)
+				log.Printf("Releasing job for: %s Id: %d %s\n", res.delay.String(), res.jobID)
 			}
 			jobCnt--
 		default:

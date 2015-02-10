@@ -31,7 +31,7 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	// marshal the data into a payload
 	jsonReq, err := json.Marshal(req)
 	if err != nil {
-		return nil, ErrJsonMarshal
+		return nil, ErrJSONMarshal
 	}
 
 	// connect to beanstalkd
@@ -45,7 +45,7 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	workerTube := beanstalk.Tube{beanConn, tube}
 
 	// send it
-	jobId, err := workerTube.Put(jsonReq, options.Priority, options.Delay, options.TTR)
+	jobID, err := workerTube.Put(jsonReq, options.Priority, options.Delay, options.TTR)
 	if err != nil {
 		return nil, ErrUnableToSend
 	}
@@ -56,7 +56,7 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	}
 
 	var (
-		resTube = tube + "_" + strconv.FormatUint(jobId, 10)
+		resTube = tube + "_" + strconv.FormatUint(jobID, 10)
 		watch   = beanstalk.NewTubeSet(beanConn, resTube)
 		id      uint64
 		msg     []byte

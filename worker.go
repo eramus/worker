@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrBeanstalkConnect = errors.New("unable to connect to beanstalk")
-	ErrJsonMarshal      = errors.New("json marshal")
+	ErrJSONMarshal      = errors.New("json marshal")
 	ErrUnableToSend     = errors.New("unable to send json")
 	ErrNoResponse       = errors.New("did not receive a response")
 )
@@ -63,13 +63,13 @@ const (
 
 type result struct {
 	result   Result
-	jobId    uint64
+	jobID    uint64
 	priority uint32
 	delay    time.Duration
 }
 
 // The function that will be performed against a unit of work.
-type WorkerFunc func(*Request) Response
+type Func func(*Request) Response
 
 // A container that describes the result of consuming a unit
 // of work.
