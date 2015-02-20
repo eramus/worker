@@ -16,9 +16,10 @@ type Worker interface {
 	Run()
 	Running() bool
 	Shutdown(chan<- struct{})
+//	GetConn() (Conn, error)
 }
 
-type worker struct {
+type beanstalkWorker struct {
 	tube       string
 	workerFunc Func
 	options    *Options
@@ -26,8 +27,93 @@ type worker struct {
 	running    bool
 }
 
+type beanstalkConn struct {
+	tube string
+	conn *beanstalk.Conn
+	options *Options
+	incoming *beanstalk.TubeSet
+}
+
+func (bc *beanstalkConn) Get() (*Request, error) {
+//incoming
+
+//	id, msg, err := bc.conn.Get()
+	// get some work
+	id, msg, err := bc.incoming.Reserve(bc.options.Reserve)
+	if err != nil {
+		cerr, ok := err.(beanstalk.ConnError)
+		if ok && cerr.Err == beanstalk.ErrTimeout {
+			return nil, nil
+		} else {
+			return nil, err
+//			panic(fmt.Sprintf("conn err: %s", err))
+		}
+	}
+
+	// unmarshal the work payload
+	req := Request{}
+	err = json.Unmarshal(msg, &req)
+	if err != nil {
+		bc.conn.Delete(id)
+		return nil, ErrBadJob
+	}
+	req.id = id
+	req.host = bc.options.Host
+
+	return &req, nil
+}
+
+func (bc *beanstalkConn) Send(job *Request, response []byte) error {
+	bc.conn.Tube.Name = bc.tube + "_" + strconv.FormatUint(job.id, 10)
+	_, err := bc.conn.Put(response, bc.options.Priority, bc.options.Delay, bc.options.TTR)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bc *beanstalkConn) Handle(id uint64, res *Response) error {
+/*		switch res.Result {
+		case BuryJob:
+			res.priority = 1
+		case ReleaseJob:
+			res.priority = 1
+			res.delay = out.Delay
+		default:
+		}*/
+
+
+
+	switch res.Result {
+	case Success:
+		return bc.conn.Delete(id)
+	case BuryJob:
+		log.Printf("Burying job. Id: %d\n", id)
+		return bc.conn.Bury(id, 1)
+	case DeleteJob:
+		log.Printf("Deleting job. Id: %d\n", id)
+		return bc.conn.Delete(id)
+	case ReleaseJob:
+		log.Printf("Releasing job for: %s Id: %d %s\n", res.Delay.String(), id)
+		return bc.conn.Release(id, 1, res.Delay)
+	}
+	return ErrUnknownResult
+}
+
+func (bc *beanstalkConn) Close() error {
+	return bc.conn.Close()
+}
+
+type Conn interface{
+	Get() (*Request, error)
+	Send(*Request, []byte) error
+	Handle(uint64, *Response) error
+	Close() error
+}
+
 type control struct {
 	completed chan result
+	errored   chan error
 	shutdown  chan struct{}
 	dead      chan struct{}
 }
@@ -41,7 +127,8 @@ func New(tube string, workerFunc Func, options *Options) Worker {
 		options = defaultOptions
 	}
 
-	w := &worker{
+//	w := &worker{
+	w := &beanstalkWorker{
 		tube:       tube,
 		workerFunc: workerFunc,
 		options:    options,
@@ -50,10 +137,26 @@ func New(tube string, workerFunc Func, options *Options) Worker {
 	return w
 }
 
+func (w *beanstalkWorker) getConn() (Conn, error) {
+	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
+	if err != nil {
+		return nil, err
+	}
+//	beanConn.incoming = beanstalk.NewTubeSet(beanConn, w.tube)
+	conn := &beanstalkConn{
+		tube: w.tube,
+		conn: beanConn,
+		options: w.options,
+		incoming: beanstalk.NewTubeSet(beanConn, w.tube),
+
+	}
+	return conn, nil
+}
+
 // After a worker has been created, it can be started with the
 // Run function. This will block until all of the workers
 // have been started.
-func (w *worker) Run() {
+func (w *beanstalkWorker) Run() {
 	if w.running {
 		return
 	}
@@ -62,6 +165,7 @@ func (w *worker) Run() {
 
 	w.control = control{
 		completed: make(chan result),
+		errored:   make(chan error),
 		shutdown:  make(chan struct{}),
 		dead:      make(chan struct{}),
 	}
@@ -73,31 +177,40 @@ func (w *worker) Run() {
 	// and we're off
 }
 
-func (w *worker) sendFeedback(job *Request, jsonRes []byte) error {
+/*func (w *worker) sendFeedback(job *Request, jsonRes []byte) error {
+// w.getConn
 	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
 	if err != nil {
 		return ErrBeanstalkConnect
 	}
 	defer beanConn.Close()
+// /w.getConn
 
+// SEND
+	err = conn.Send(job, jsonRes)
+	if err != nil {
+		return err
+	}
+	return nil
 	beanConn.Tube.Name = w.tube + "_" + strconv.FormatUint(job.id, 10)
 	_, err = beanConn.Put(jsonRes, w.options.Priority, w.options.Delay, w.options.TTR)
 	if err != nil {
 		return err
 	}
 	return nil
-}
+// /SEND
+}*/
 
-func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
+func (w *beanstalkWorker) work(jobs <-chan Request, done chan<- struct{}) {
 	// catch a worker that has paniced
 	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println("worker panic:", r)
-			w.control.dead <- struct{}{}
-		} else {
+//		r := recover()
+//		if r != nil {
+/*			log.Println("worker panic:", r)
+			w.control.dead <- struct{}{}*/
+//		} else {
 			done <- struct{}{}
-		}
+//		}
 	}()
 
 	for {
@@ -108,32 +221,49 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 
 		out := w.workerFunc(&job)
 
+/*
 		res := result{
 			result: out.Result,
 			jobID:  job.id,
 		}
+*/
 
-		switch out.Result {
-		case BuryJob:
-			res.priority = 1
-		case ReleaseJob:
-			res.priority = 1
-			res.delay = out.Delay
-		default:
+		err := conn.Handle(job.id, &out)
+		if err != nil {
+			w.control.errored <- err
+			continue
 		}
+
 
 		// send back a response if requested
 		if job.Feedback && out.Result != ReleaseJob {
 			jsonRes, err := json.Marshal(out)
 			if err != nil {
-				panic(fmt.Sprintf("response json err: %s", err))
+				w.control.errored <- err
+				continue
+//				panic(fmt.Sprintf("response json err: %s", err))
 			}
 
+		 	conn, err := w.getConn()
+			if err != nil {
+				w.control.errored <- err
+				continue
+			}
+
+			err = conn.Send(job, jsonRes)
+			conn.Close()
+			if err != nil {
+				w.control.errored <- err
+				continue
+			}
+//	return nil
+
+/*
 			// send back a response
 			err = w.sendFeedback(&job, jsonRes)
 			if err != nil {
 				panic(fmt.Sprintf("worker response err: %s", err))
-			}
+			}*/
 		}
 
 		// send back the work results
@@ -141,11 +271,18 @@ func (w *worker) work(jobs <-chan Request, done chan<- struct{}) {
 	}
 }
 
-func (w *worker) run(started chan<- struct{}) {
-	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
+func (w *beanstalkWorker) run(started chan<- struct{}) {
+// w.GetConn
+	conn, err := w.getConn()
 	if err != nil {
 		panic(fmt.Sprintf("dial err: %s", err))
 	}
+
+/*	beanConn, err := beanstalk.Dial("tcp", w.options.Host)
+	if err != nil {
+		panic(fmt.Sprintf("dial err: %s", err))
+	}*/
+// /w.GetConn
 
 	// worker comm channels
 	jobs := make(chan Request)
@@ -153,7 +290,10 @@ func (w *worker) run(started chan<- struct{}) {
 
 	defer func() {
 		// close the conn
-		beanConn.Close()
+// c.Close
+		conn.Close()
+//		beanConn.Close()
+// /c.Close
 		// shutdown the workers
 		close(jobs)
 		// wait for them to stop
@@ -172,7 +312,7 @@ func (w *worker) run(started chan<- struct{}) {
 	}
 
 	// watch the worker tube
-	var watch = beanstalk.NewTubeSet(beanConn, w.tube)
+//	var watch = beanstalk.NewTubeSet(beanConn, w.tube)
 
 	// off we go
 	close(started)
@@ -182,9 +322,14 @@ func (w *worker) run(started chan<- struct{}) {
 	for jobCnt > 0 || running {
 		// check the control channels
 		select {
-		case res := <-w.control.completed:
+		case err := <-w.control.errored:
+			log.Printf("Job errored: %s\n", err)
+			fallthrough
+		case <-w.control.completed:
+// c.Finish
 			// a worker is finished -- handle it
-			switch res.result {
+//			err = conn.Handle(res)
+/*			switch res.result {
 			case Success:
 				beanConn.Delete(res.jobID)
 			case BuryJob:
@@ -196,7 +341,8 @@ func (w *worker) run(started chan<- struct{}) {
 			case ReleaseJob:
 				beanConn.Release(res.jobID, res.priority, res.delay)
 				log.Printf("Releasing job for: %s Id: %d %s\n", res.delay.String(), res.jobID)
-			}
+			}*/
+// /c.Finish
 			jobCnt--
 		default:
 		}
@@ -218,6 +364,14 @@ func (w *worker) run(started chan<- struct{}) {
 		default:
 		}
 
+// c.Get
+		req, err := conn.Get()
+		if err != nil {
+			panic(fmt.Sprintf("conn err: %s", err))
+		} else if req == nil {
+			continue
+		}
+/*		id, msg, err := conn.Get()
 		// get some work
 		id, msg, err := watch.Reserve(w.options.Reserve)
 		if err != nil {
@@ -237,7 +391,8 @@ func (w *worker) run(started chan<- struct{}) {
 			continue
 		}
 		job.id = id
-		job.host = w.options.Host
+		job.host = w.options.Host*/
+// /c.Get
 
 		jobCnt++
 		go func(j Request) {
@@ -248,7 +403,7 @@ func (w *worker) run(started chan<- struct{}) {
 }
 
 // Running will return the current running status of a worker.
-func (w *worker) Running() bool {
+func (w *beanstalkWorker) Running() bool {
 	return w.running
 }
 
@@ -256,7 +411,7 @@ func (w *worker) Running() bool {
 // instances and the Run routine to prepare to shutdown. Shutdown
 // accepts an optional channel that serves as a notification that
 // the shutdown has completed succesfully.
-func (w *worker) Shutdown(finished chan<- struct{}) {
+func (w *beanstalkWorker) Shutdown(finished chan<- struct{}) {
 	if !w.running {
 		return
 	}

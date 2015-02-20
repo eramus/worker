@@ -14,6 +14,9 @@ var (
 	ErrJSONMarshal      = errors.New("json marshal")
 	ErrUnableToSend     = errors.New("unable to send json")
 	ErrNoResponse       = errors.New("did not receive a response")
+	ErrNoConn           = errors.New("no worker conn")
+	ErrUnknownResult    = errors.New("unknown result of response")
+	ErrBadJob           = errors.New("got a bad job")
 )
 
 // Common beanstalkd options that are used by
