@@ -27,6 +27,12 @@ type beanstalkWorker struct {
 	running    bool
 }
 
+type Conn interface{
+	Get() (Request, error)
+//	Send(Request, []byte) error
+	Close() error
+}
+
 type beanstalkConn struct {
 	tube string
 	conn *beanstalk.Conn
@@ -34,45 +40,16 @@ type beanstalkConn struct {
 	incoming *beanstalk.TubeSet
 }
 
-func (bc *beanstalkConn) Get() (*Request, error) {
-//incoming
-
-//	id, msg, err := bc.conn.Get()
-	// get some work
-	id, msg, err := bc.incoming.Reserve(bc.options.Reserve)
-	if err != nil {
-		cerr, ok := err.(beanstalk.ConnError)
-		if ok && cerr.Err == beanstalk.ErrTimeout {
-			return nil, nil
-		} else {
-			return nil, err
-//			panic(fmt.Sprintf("conn err: %s", err))
-		}
-	}
-
-	// unmarshal the work payload
-	req := Request{}
-	err = json.Unmarshal(msg, &req)
-	if err != nil {
-		bc.conn.Delete(id)
-		return nil, ErrBadJob
-	}
-	req.id = id
-	req.host = bc.options.Host
-
-	return &req, nil
+// A container that describes the result of consuming a unit
+// of work.
+type Response struct {
+	Result Result        `json:"-"`
+	Data   interface{}   `json:"data"`
+	Error  string        `json:"error"`
+	Delay  time.Duration `json:"-"`
 }
 
-func (bc *beanstalkConn) Send(job *Request, response []byte) error {
-	bc.conn.Tube.Name = bc.tube + "_" + strconv.FormatUint(job.id, 10)
-	_, err := bc.conn.Put(response, bc.options.Priority, bc.options.Delay, bc.options.TTR)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (bc *beanstalkConn) Handle(id uint64, res *Response) error {
+func (br *beanstalkRequest) Handle(res *Response) error {
 /*		switch res.Result {
 		case BuryJob:
 			res.priority = 1
@@ -100,15 +77,50 @@ func (bc *beanstalkConn) Handle(id uint64, res *Response) error {
 	return ErrUnknownResult
 }
 
-func (bc *beanstalkConn) Close() error {
-	return bc.conn.Close()
+func (br *beanstalkRequest) Finish(response Response) error {
+
 }
 
-type Conn interface{
-	Get() (*Request, error)
-	Send(*Request, []byte) error
-	Handle(uint64, *Response) error
-	Close() error
+func (bc *beanstalkConn) Get() (Request, error) {
+//incoming
+
+//	id, msg, err := bc.conn.Get()
+	// get some work
+	id, msg, err := bc.incoming.Reserve(bc.options.Reserve)
+	if err != nil {
+		cerr, ok := err.(beanstalk.ConnError)
+		if ok && cerr.Err == beanstalk.ErrTimeout {
+			return nil, nil
+		} else {
+			return nil, err
+//			panic(fmt.Sprintf("conn err: %s", err))
+		}
+	}
+
+	// unmarshal the work payload
+	req := &beanstalkRequest{}
+	err = json.Unmarshal(msg, req)
+	if err != nil {
+		bc.conn.Delete(id)
+		return nil, ErrBadJob
+	}
+	req.id = id
+	req.host = bc.options.Host
+
+	return req, nil
+}
+
+func (bc *beanstalkConn) Send(job *Request, response []byte) error {
+	bc.conn.Tube.Name = bc.tube + "_" + strconv.FormatUint(job.id, 10)
+	_, err := bc.conn.Put(response, bc.options.Priority, bc.options.Delay, bc.options.TTR)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bc *beanstalkConn) Close() error {
+	return bc.conn.Close()
 }
 
 type control struct {
