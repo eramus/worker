@@ -90,8 +90,10 @@ type DefaultRequest struct {
 
 type beanstalkRequest struct {
 	DefaultRequest
+	tube string
 	id       uint64          `json:"-"`
-	host     string          `json:"-"`
+	options *Options
+//	host     string          `json:"-"`
 }
 
 // Helper function for retrying a job. This accepts an error and a

@@ -49,7 +49,72 @@ type Response struct {
 	Delay  time.Duration `json:"-"`
 }
 
+func (br *beanstalkRequest) sendFeedback(res *Response) error {
+			jsonRes, err := json.Marshal(res)
+			if err != nil {
+				return err
+			}
+
+
+	beanConn, err := beanstalk.Dial("tcp", br.options.Host)
+	if err != nil {
+		return ErrBeanstalkConnect
+	}
+	defer beanConn.Close()
+
+	beanConn.Tube.Name = br.tube + "_" + strconv.FormatUint(br.id, 10)
+	_, err = beanConn.Put(jsonRes, br.options.Priority, br.options.Delay, br.options.TTR)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (br *beanstalkRequest) Handle(res *Response) error {
+
+
+
+		// send back a response if requested
+		if br.Feedback && res.Result != ReleaseJob {
+/*			jsonRes, err := json.Marshal(res)
+			if err != nil {
+				return err
+//				w.control.errored <- err
+//				continue
+//				panic(fmt.Sprintf("response json err: %s", err))
+			}*/
+
+			err = br.sendFeedback(res)
+			if err != nil {
+				return err
+			}
+
+/*		 	conn, err := w.getConn()
+			if err != nil {
+				return err
+//				w.control.errored <- err
+//				continue
+			}
+
+			err = conn.Send(job, jsonRes)
+			conn.Close()
+			if err != nil {
+				w.control.errored <- err
+				continue
+			}*/
+//	return nil
+
+/*
+			// send back a response
+			err = w.sendFeedback(&job, jsonRes)
+			if err != nil {
+				panic(fmt.Sprintf("worker response err: %s", err))
+			}*/
+		}
+
+
+
+
 /*		switch res.Result {
 		case BuryJob:
 			res.priority = 1
@@ -105,7 +170,8 @@ func (bc *beanstalkConn) Get() (Request, error) {
 		return nil, ErrBadJob
 	}
 	req.id = id
-	req.host = bc.options.Host
+//	req.host = bc.options.Host
+	req.options = bc.options
 
 	return req, nil
 }
@@ -240,7 +306,13 @@ func (w *beanstalkWorker) work(jobs <-chan Request, done chan<- struct{}) {
 		}
 */
 
-		err := conn.Handle(job.id, &out)
+/*		err := conn.Handle(job.id, &out)
+		if err != nil {
+			w.control.errored <- err
+			continue
+		}*/
+
+		err := job.Handle(&out)
 		if err != nil {
 			w.control.errored <- err
 			continue
@@ -303,7 +375,7 @@ func (w *beanstalkWorker) run(started chan<- struct{}) {
 	defer func() {
 		// close the conn
 // c.Close
-		conn.Close()
+//		conn.Close()
 //		beanConn.Close()
 // /c.Close
 		// shutdown the workers
@@ -315,6 +387,7 @@ func (w *beanstalkWorker) run(started chan<- struct{}) {
 			case <-w.control.dead:
 			}
 		}
+		conn.Close()
 		close(w.control.shutdown)
 	}()
 
