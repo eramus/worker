@@ -51,7 +51,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 // are combined for this example.
 func main() {
 	// define and run a worker
-	add := worker.New(addTube, add, nil)
+	add, _ := worker.New(addTube, add, nil)
 	add.Run()
 
 	// shutdown the worker on exit
@@ -88,10 +88,10 @@ type Worker interface {
 This interface is used to hide the implementation of the base package from the caller. This exposes just enough functionality to keep working with and defining a worker simple. ```Run``` will block until all worker instances have been launched. ```Shutdown``` does not block so that multiple workers can be shutdown at the same time. ```Shutdown``` accepts an optional channel that can be used to signal the main caller that the shutdown was completed successfully.
 
 ```go
-func New(tube string, workerFunc Func, options *Options) Worker
+func New(tube string, workerFunc Func, options *Options) (Worker, error)
 ```
 
-```New``` will return a ```Worker``` to the caller. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```options``` is an optional parameter for configuring the underlying beanstalkd connection and number of worker routines that will be spawned.
+```New``` will return a ```Worker``` to the caller. Will fail if a connection to beanstalk is not possible. Underneath it creates a ```worker``` to encapsulate the details and functionality for running a worker. ```tube``` will be the beanstalk tube that the worker will respond to. ```workerFunc``` is a function that will be called when work is delivered via ```tube```. ```options``` is an optional parameter for configuring the underlying beanstalkd connection and number of worker routines that will be spawned.
 
 ```go
 type Func func(*Request) Response
@@ -129,6 +129,28 @@ func (r *Request) DeleteJob(err error) Response
 
 ```DeleteJob``` is used for cases that a work request should just be deleted on error.
 
-## TODO ##
+## TEST ##
 
-* tests!
+### Easiest way (i.e. Using docker compose)
+
+Just run
+
+	make test
+
+You don't need to have anything installed in your machine besides `docker` and `docker-compose`.
+
+### The other way
+
+* Make sure this library is in the path `$GOPATH/src/github.com/eramus/worker`
+* Install beanstalkd
+* `go get github.com/kr/beanstalk`
+* `go get github.com/onsi/ginkgo/ginkgo`
+* `go get github.com/onsi/gomega`
+
+And
+
+	ginkgo tests
+
+## WISHLIST ##
+
+More tests!

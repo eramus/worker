@@ -35,10 +35,9 @@ type control struct {
 // NewWorker will return a Worker interface that can be used
 // to control the underlying worker. If options is nil, the
 // default beanstalkd options will be used.
-// TODO: better option handling
-func New(tube string, workerFunc Func, options *Options) Worker {
-	if options == nil {
-		options = defaultOptions
+func New(tube string, workerFunc Func, options *Options) (Worker, error) {
+	if err := fillOptions(options); err != nil {
+		return nil, err
 	}
 
 	w := &worker{
@@ -47,7 +46,56 @@ func New(tube string, workerFunc Func, options *Options) Worker {
 		options:    options,
 	}
 
-	return w
+	return w, nil
+}
+
+// fillOptions will evaluate whether there are options for
+// the worker to be included. If there is a failing property
+// default values will be set. The beanstalkd connection will
+// be tested.
+func fillOptions(options *Options) error {
+	if options == nil {
+		options = defaultOptions
+		return nil
+	}
+
+	if options.Host == "" {
+		options.Host = defaultOptions.Host
+	}
+
+	if options.Count == 0 {
+		options.Count = defaultOptions.Count
+	}
+
+	if options.Reserve == 0 {
+		options.Reserve = defaultOptions.Reserve
+	}
+
+	if options.Priority == 0 {
+		options.Priority = defaultOptions.Priority
+	}
+
+	if options.Delay == 0 {
+		options.Delay = defaultOptions.Delay
+	}
+
+	if options.TTR == 0 {
+		options.TTR = defaultOptions.TTR
+	}
+
+	if options.Wait == 0 {
+		options.Wait = defaultOptions.Wait
+	}
+
+	// We should check if the connection works
+	// so we can fail fast
+	beanConn, err := beanstalk.Dial("tcp", options.Host)
+	if err != nil {
+		return ErrBeanstalkConnect
+	}
+	defer beanConn.Close()
+
+	return nil
 }
 
 // After a worker has been created, it can be started with the

@@ -33,7 +33,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 // are combined for this example.
 func main() {
 	// define and run a worker
-	add := worker.New(addTube, add, nil)
+	add, _ := worker.New(addTube, add, nil)
 	add.Run()
 
 	// shutdown the worker on exit

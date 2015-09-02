@@ -26,7 +26,7 @@ var add = func(req *worker.Request) (res worker.Response) {
 }
 
 func main() {
-	add := worker.New(addResponseTube, add, nil)
+	add, _ := worker.New(addResponseTube, add, nil)
 	add.Run()
 
 	defer func() {

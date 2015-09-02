@@ -43,7 +43,7 @@ func (g *group) Add(tube string, workerFunc Func) {
 		panic("worker name must be unique")
 	}
 
-	w := New(tube, workerFunc, g.options)
+	w, _ := New(tube, workerFunc, g.options)
 	g.workers[tube] = w
 }
 

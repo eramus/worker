@@ -1,0 +1,15 @@
+eramus_worker_test:
+    image: hermanjunge/ginkgo
+    volumes:
+        - ./..:/go/src/github.com/eramus/worker
+    links:
+        - eramus_worker_test_beanstalkd:beanstalkd
+    environment:
+        GO15VENDOREXPERIMENT: 1
+    working_dir: /go/src/github.com/eramus/worker
+    command: /bin/bash -c "./docker/test.sh"
+
+eramus_worker_test_beanstalkd:
+    image: schickling/beanstalkd
+    ports:
+        - "11300:11300"
