@@ -1,0 +1,10 @@
+{
+	"ImportPath": "github.com/eramus/worker",
+	"GoVersion": "go1.5",
+	"Deps": [
+		{
+			"ImportPath": "github.com/kr/beanstalk",
+			"Rev": "4011ceaa3ceeeeb8f38e541d2e8efceba6d0b86e"
+		}
+	]
+}
