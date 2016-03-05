@@ -3,6 +3,7 @@ package worker
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strconv"
 	"time"
 
@@ -19,6 +20,7 @@ var (
 // Common beanstalkd options that are used by
 // this package.
 type Options struct {
+	Conn     io.ReadWriteCloser
 	Host     string
 	Count    int
 	Reserve  time.Duration
@@ -29,9 +31,10 @@ type Options struct {
 }
 
 var defaultOptions = &Options{
+	Conn:     nil,
 	Host:     "0.0.0.0:11300",
 	Count:    1,
-	Reserve:  (2 * time.Second),
+	Reserve:  (500 * time.Millisecond),
 	Priority: 0,
 	Delay:    time.Duration(0),
 	TTR:      (3600 * time.Second),

@@ -35,11 +35,17 @@ func Send(tube string, data interface{}, feedback bool, options *Options) ([]byt
 	}
 
 	// connect to beanstalkd
-	beanConn, err := beanstalk.Dial("tcp", options.Host)
-	if err != nil {
-		return nil, ErrBeanstalkConnect
+	var beanConn *beanstalk.Conn
+
+	if options.Conn == nil {
+		beanConn, err = beanstalk.Dial("tcp", options.Host)
+		if err != nil {
+			return nil, ErrBeanstalkConnect
+		}
+		defer beanConn.Close()
+	} else {
+		beanConn = beanstalk.NewConn(options.Conn)
 	}
-	defer beanConn.Close()
 
 	// configure conn for send tube
 	workerTube := beanstalk.Tube{beanConn, tube}
