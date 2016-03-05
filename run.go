@@ -25,7 +25,6 @@ type worker struct {
 	options    *Options
 	control    control
 	running    bool
-	count      int64
 }
 
 type control struct {
